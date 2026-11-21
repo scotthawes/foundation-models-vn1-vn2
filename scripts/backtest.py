@@ -75,6 +75,8 @@ def main() -> int:
     parser.add_argument("--anchors", default="tuning", choices=sorted(ANCHOR_SETS))
     parser.add_argument("--arms", default="benchmark,seasonal_ma,chronos,tabpfn_api")
     parser.add_argument("--coverages", default="3,3.5,4,4.5,5")
+    parser.add_argument("--target", default="raw", choices=["raw", "log1p", "ratio"],
+                        help="target transform for the TabPFN arm only")
     parser.add_argument("--tag", default=None)
     args = parser.parse_args()
 
@@ -92,7 +94,11 @@ def main() -> int:
     rows = []
     for name in arm_names:
         started = time.time()
-        forecaster_fn = cache_forecasts(ARMS[name]())  # one model load per arm, not per fold
+        # The tabular arm is the only one with a target choice; everything else ignores the flag.
+        if name == "tabpfn_api":
+            forecaster_fn = cache_forecasts(ARMS[name](target=args.target))
+        else:
+            forecaster_fn = cache_forecasts(ARMS[name]())  # one model load per arm, not per fold
         # The benchmark is the published 4,334.0 at coverage 4; sweeping it would only relabel it.
         arm_coverages = [4.0] if name == "benchmark" else coverages
         for fold in folds:
@@ -119,7 +125,10 @@ def main() -> int:
         coverage = label[1] if isinstance(label, tuple) else label
         print(f"  {arm:12s} coverage {coverage:<4} mean {summary.loc[(arm, coverage), 'mean']:,.1f}")
 
-    out = Path("results") / f"backtest-{args.tag or args.anchors}.csv"
+    out = Path("results") / (
+        f"backtest-{args.tag or args.anchors}"
+        f"{'-' + args.target if args.target != 'raw' else ''}.csv"
+    )
     out.parent.mkdir(exist_ok=True)
     results.to_csv(out, index=False)
     print(f"\nwrote {out}")

@@ -201,6 +201,14 @@ is retired from the comparison after the one check above — it runs once, and o
 tuning anchors keeps it alive. No further TabPFN tuning is planned; the arm code stays in the tree
 so the check is reproducible.
 
+The check is one command; the transform is named explicitly so a raw-target run cannot be mistaken
+for the ratio one:
+
+```bash
+python3 scripts/backtest.py --anchors tuning --arms benchmark,seasonal_ma,tabpfn_api \
+    --coverages 3.5 --target ratio --tag tuning-ratio
+```
+
 ## Costs and quota
 
 TabPFN free tier: 5M tokens/day, 20M/month, 10k-token minimum per operation, reset midnight UTC.
