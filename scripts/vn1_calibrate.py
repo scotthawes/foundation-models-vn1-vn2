@@ -72,15 +72,17 @@ def fit_and_score(model, sales0, price0, sales1, history2, price2, sales2, origi
         history = sales0.iloc[:, : origin + 1]
         forecast = model(history, price0.iloc[:, : origin + 1])
         frame = features(history, forecast, price0.iloc[:, : origin + 1])
-        actual = sales0.iloc[:, origin + 1 : origin + HORIZON + 1].to_numpy().reshape(-1)
+        # features() is horizon-major (all series for h=1, then h=2, ...), so the target must be
+        # flattened the same way; a naive reshape would pair every horizon with the wrong series.
+        actual = sales0.iloc[:, origin + 1 : origin + HORIZON + 1].to_numpy().T.reshape(-1)
         frame["target"] = actual
         train_X.append(frame)
     train = pd.concat(train_X, ignore_index=True)
     feature_columns = ["forecast", "horizon", "level", "zero_share", "price", "iso_sin", "iso_cos"]
 
     learner = lgb.LGBMRegressor(
-        objective="regression_l1", n_estimators=300, learning_rate=0.05, num_leaves=31,
-        min_child_samples=50, random_state=0, n_jobs=-1,
+        objective="regression", n_estimators=300, learning_rate=0.05, num_leaves=31,
+        min_child_samples=50, random_state=0, n_jobs=1,
     )
     learner.fit(train[feature_columns], train["target"])
 
@@ -88,7 +90,8 @@ def fit_and_score(model, sales0, price0, sales1, history2, price2, sales2, origi
         forecast = model(history, price)
         frame = features(history, forecast, price)
         values = np.clip(learner.predict(frame[feature_columns]), 0.0, None)
-        return pd.DataFrame(values.reshape(len(history), HORIZON), index=history.index,
+        # Undo the horizon-major order the features were built in.
+        return pd.DataFrame(values.reshape(HORIZON, len(history)).T, index=history.index,
                             columns=forecast.columns)
 
     phase1 = predict(sales0, price0)

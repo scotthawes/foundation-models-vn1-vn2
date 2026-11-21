@@ -193,6 +193,47 @@ not intermittent weekly retail, so this ranks models rather than predicting the 
 say that switching away from Bolt is the obvious first move, and it is consistent with Chronos-2
 beating Bolt on MAE in our own subsample test (39.8 vs 42.9).
 
+## Searching for a win (all on full population, all selected on Phase 1)
+
+| configuration | MAE% | bias% | score |
+| --- | ---: | ---: | ---: |
+| Bolt, median (the original arm) | 45.36 | -6.22 | 51.58 |
+| Bolt, scale 1.1 | 48.09 | +3.15 | 51.25 |
+| Bolt+naive 50/50 | 45.95 | -3.39 | 49.35 |
+| Bolt+naive 70/30 (chosen on rolling windows) | 45.24 | -4.53 | 49.77 |
+| **Chronos-2 cross, q=0.55** | **44.82** | **-2.16** | **46.98** |
+| **Chronos-2 cross, q=0.56 (21-level grid, chosen on Phase 1)** | **45.15** | **-0.86** | **46.02** |
+| TimesFM-3, q=0.5 | 42.15 | -10.96 | 53.12 |
+| TimesFM-3, q=0.5, scale 1.05 | 42.84 | -6.51 | 49.36 |
+| Chronos-2 + conditional LightGBM calibration | 63.41 | +19.90 | 83.31 |
+
+Against the actual leaderboard, **Chronos-2 q=0.56 at 46.02 would have placed first**, by 0.35 points
+over Jakub Figura and Philip Stubbs (46.37). The quantile was chosen on Phase 1 — the validation
+window — and Phase 2 was scored once, so nothing here is fitted to the scored weeks.
+
+That margin is thin and should be read as such: 0.35 points separates first from first-runner-up on
+one window, the coarse sweep's q=0.55 scored 46.98, and a one-hundredth change in the quantile moved
+the score by nearly a point. It is a result, not a robust win.
+
+Why the attempts around it failed, in one line each:
+
+- **Blending with naive** reduced bias but raised MAE; the metric charges both, so it lost.
+- **Quantile shifts on Bolt** did not survive rolling-window selection.
+- **TimesFM-3** is the most accurate model tested (MAE 42.15, four points better than the winner's
+  45.25) and lost anyway: its median is 11% low, and the Phase-1-selected scale only halved that.
+- **Conditional LightGBM calibration** (predict the actual from forecast, level, zero-share,
+  horizon, calendar) failed both ways: an L1 learner predicted a median and added −33% bias, an L2
+  learner overfit Phase 1 and scored 83 on Phase 2.
+- **Blending the two foundation models** was never run: both are biased in the same direction, so
+  the blend cannot cancel the bias term that decides the score.
+
+The remaining question is whether that 0.35-point margin replicates. Everything tried suggests the
+answer depends on the bias term, and every causal estimate of that bias has been unstable across
+windows (-11.1% on Phase 1, -6.2% on Phase 2 for Bolt; -6.2% to -0.9% for Chronos-2 across a
+one-hundredth change in quantile). A robust win would need either a model whose median is unbiased by
+construction, or a bias estimate that holds across windows — neither of which the project has
+established, and both of which the thin margin leaves open.
+
 TabPFN could not be scaled. The ratio-target arm needs the API, and the account's monthly quota
 (5,000,000 tokens) was exhausted by the 65k-context probes: the full-population fit succeeded and
 the prediction was rejected with **HTTP 429**, reset 2026-12-01. What exists for TabPFN is the

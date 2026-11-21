@@ -165,6 +165,67 @@ def chronos_quantiles(context_weeks: int | None = 152, horizon: int = HORIZON,
     return forecaster
 
 
+def chronos2_quantiles(context_weeks: int | None = None, horizon: int = HORIZON,
+                       batch_size: int = 128, cross_learning: bool = False,
+                       use_price: bool = False):
+    """Chronos-2's 21 quantiles as `(series, quantiles, horizon)`, plus the level grid."""
+    pipeline = None
+
+    def forecaster(sales: pd.DataFrame, price: pd.DataFrame):
+        nonlocal pipeline
+        import torch
+
+        from vn2.forecaster.chronos_arm import _load
+
+        if pipeline is None:
+            pipeline = _load("amazon/chronos-2")
+
+        context = sales if context_weeks is None else sales.iloc[:, -context_weeks:]
+        values = context.to_numpy(dtype=np.float32)
+        if use_price:
+            prices = price.reindex(columns=context.columns).to_numpy(dtype=np.float32)
+            inputs = [{"target": values[i], "past_covariates": {"price": prices[i]}}
+                      for i in range(len(values))]
+        else:
+            inputs = values[:, None, :]
+        forecast = pipeline.predict(inputs, prediction_length=horizon, batch_size=batch_size,
+                                    cross_learning=cross_learning)
+        stacked = np.stack([np.asarray(t, dtype=float).squeeze(0) for t in forecast])
+        return np.clip(stacked, 0.0, None), np.asarray(pipeline.quantiles, dtype=float)
+
+    return forecaster
+
+
+def timesfm3_quantiles(horizon: int = HORIZON, context_weeks: int | None = None):
+    """TimesFM-3's nine quantiles as `(series, quantiles, horizon)`, computed once per origin.
+
+    Same idea as the Bolt quantile tensor: the score-aware choice of quantile is a selection from
+    this array, so sweeping q on a full-population run costs no extra inference.
+    """
+    model = None
+
+    def forecaster(sales: pd.DataFrame, price: pd.DataFrame) -> np.ndarray:
+        nonlocal model
+        if model is None:
+            from timesfm import TimesFM3Forecaster
+
+            model = TimesFM3Forecaster.from_pretrained(device="mps")
+
+        context = sales if context_weeks is None else sales.iloc[:, -context_weeks:]
+        outputs = list(
+            model.predict_batch(
+                [row for row in context.to_numpy(dtype=float)],
+                horizon=horizon,
+                return_quantiles=True,
+                make_positive=True,
+            )
+        )
+        stacked = np.stack([np.asarray(out.quantiles) for out in outputs])  # (series, horizon, 9)
+        return np.clip(stacked.transpose(0, 2, 1), 0.0, None)
+
+    return forecaster
+
+
 def timesfm3(horizon: int = HORIZON, quantile: float = 0.5, context_weeks: int | None = None):
     """TimesFM-3 — the GIFT-Eval leader among zero-shot foundation models.
 

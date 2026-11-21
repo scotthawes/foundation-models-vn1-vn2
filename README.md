@@ -108,8 +108,9 @@ The competition data is downloaded, not redistributed: `data/` is git-ignored.
 `vn1-pilot` adds a second, cleaner test of the same question: VN1 scores pure 13-week forecast
 error over 15,053 series with a price covariate, so no ordering policy hides the forecast. It
 reproduces the organisers' MA12 baseline (0.6597) as a test. On Phase 1 Chronos beats that baseline
-(0.5502 vs 0.6597); on **Phase 2, the window that actually ranked**, Chronos scores 51.25% against
-the winner's 46.37% and the naive forecast's 50.70% — its MAE ties the winner's, but its median bias
-costs five points. Results, the winners' methods and the sample-bias lesson are in
+(0.5502 vs 0.6597). On **Phase 2, the window that actually ranked**, Chronos-2 at quantile 0.56 —
+chosen on Phase 1 — scores **46.02%, ahead of the winning entry's 46.37%** by 0.35 points; the
+original Bolt arm scored 51.58. The margin is thin and the window is single; results, the failed
+levers and the GIFT-Eval model ranking are in
 [`docs/vn1-pilot.md`](docs/vn1-pilot.md); run it with `python3 scripts/vn1_pilot.py --series 500`
 or `--all`.
