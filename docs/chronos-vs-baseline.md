@@ -42,6 +42,45 @@ A moving average with coverage 3.5 is a cost-aware policy by construction; Chron
 calibrated to that asymmetry, and its quantiles are wide enough that buying service level with them
 costs more in holding than it recovers in shortages.
 
+## Why Chronos loses on VN2: measured
+
+**It is not accuracy.** Over the played weeks, total absolute forecast error is 7,590 for Chronos
+and 7,648 for the moving average — Chronos is marginally the better forecaster in the unweighted
+sense. It loses because the errors are in the wrong place and have the wrong sign.
+
+The ordering policy is written for a **mean** demand level. The moving average estimates the mean
+directly. Chronos returns the **median**, and for right-skewed intermittent demand the median sits
+below the mean by a factor that varies with each series' skew. Over the played weeks Chronos
+forecasts 0.79 of realised demand in aggregate; the moving average forecasts 1.01.
+
+That bias is not spread evenly, and this is the part that decides the score — forecast/actual ratio
+by volume decile:
+
+| volume decile | share of units | MA ratio | Chronos ratio |
+| ---: | ---: | ---: | ---: |
+| 7 | 5.8% | 0.82 | 0.59 |
+| 8 | 8.9% | 0.92 | 0.74 |
+| **9** | **66.5%** | **0.97** | **0.80** |
+
+Two-thirds of the units live in decile 9, where the moving average is calibrated (0.97) and Chronos
+is 20% low. So the moving average's errors are concentrated on low-volume series where a held unit
+costs 0.2 EUR, and Chronos's are concentrated where a lost unit costs 1 EUR.
+
+A **single global scale cannot fix a per-series bias**, which is why the wider grid failed
+monotonically. What scaling buys, on the played weeks:
+
+| Chronos configuration | score | lost sales | holding cost |
+| --- | ---: | ---: | ---: |
+| median, coverage 3.5 | 4,237.2 | 2,541 | 1,696.2 |
+| scale 1.3, coverage 3.0 | 4,166.6 | 2,005 | 2,161.6 |
+| scale 1.3, coverage 3.5 | 4,423.8 | 1,461 | 2,962.8 |
+
+Lifting the forecast by 30% removes 536 lost sales for 466 EUR of extra holding — near break-even,
+because it adds stock to the low-volume series that were already over-forecast while only partly
+fixing the high-volume ones. The remaining lever is therefore **per-series calibration**: estimate
+each series' forecast bias on earlier windows and correct that series only. That is untested here,
+and it is the only lever the diagnosis leaves open.
+
 ## VN1: yes, and already at the median
 
 VN1's score is absolute error plus a bias penalty, so the median is the right forecast and the only
