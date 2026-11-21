@@ -143,6 +143,7 @@ def test_every_arm_is_a_factory_returning_a_callable():
         forecaster.seasonal_moving_average,
         forecaster.tabpfn,
         forecaster.chronos,
+        forecaster.chronos2,
         forecaster.tabpfn_api,
         forecaster.timegpt,
     ):

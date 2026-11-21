@@ -268,6 +268,22 @@ scale and calibration results, this shows the aggregate level was never the bind
 Chronos tops out around 4,850-4,950 on tuning regardless of how the level is set, and the gap to the
 moving average is in how stock is allocated across series.
 
+## Amendment 2026-11-21 (4): the VN1-winning model on VN2
+
+Chronos-2 won VN1, so it was tried on VN2 with the same two levers: cross-learning and a quantile.
+The quantile and coverage were chosen on the tuning anchors (q=0.6, coverage 3.0 → 4,626.2), then
+the evaluation anchors and the competition weeks were run once each for that configuration.
+
+| board | `seasonal_ma` | Chronos-2 q=0.6, cov 3.0 | gap |
+| --- | ---: | ---: | ---: |
+| tuning anchors | 4,365.3 | 4,626.2 | 261 |
+| evaluation anchors | 5,739.8 | 6,013.2 | 273 |
+| competition weeks | 3,915.0 | 4,077.2 | 162 |
+
+Chronos-2 beats the published benchmark (4,334.0) and improves on Bolt by 160 EUR, but does not beat
+the moving average on any board. VN2's conclusion is unchanged, now with three consistent pieces of
+evidence rather than one.
+
 ## Costs and quota
 
 TabPFN free tier: 5M tokens/day, 20M/month, 10k-token minimum per operation, reset midnight UTC.

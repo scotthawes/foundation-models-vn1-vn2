@@ -37,9 +37,11 @@ is larger than every gap being argued about. Full tables, bars and verdicts in
 that beats the organisers' baseline on VN1. TabPFN is retired from the comparison except for one
 pre-registered VN2 check with a ratio target, queued for when the API quota resets.
 
-Whether Chronos can beat the moving average depends on the task: **yes on VN1** (0.5502 against
-0.6597 once calibrated) and **no on VN2** (6,828 against 5,740 on the evaluation anchors, after
-sweeping quantile, scale and coverage). The tests and the mechanism are in
+Whether the foundation model can beat the moving average depends on the task: **yes on VN1** —
+Chronos-2 at quantile 0.56 scores 46.02% against the winning entry's 46.37% — and **no on VN2**,
+where the best foundation arm (Chronos-2, cross-learning, q=0.6, coverage 3.0) scores **4,077 €**
+against the moving average's **3,915 €** on the played weeks, though it beats the 4,334 € benchmark.
+The mechanism and every failed lever are in [`FINDINGS.md`](FINDINGS.md) and
 [`docs/chronos-vs-baseline.md`](docs/chronos-vs-baseline.md).
 
 ## Quickstart

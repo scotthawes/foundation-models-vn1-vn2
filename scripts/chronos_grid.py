@@ -41,7 +41,8 @@ def float_list(text: str) -> list[float]:
 
 
 def vn2_grid(quantiles: list[float], scales: list[float], coverages: list[float],
-             anchors=backtest.TUNING_ANCHORS, calibrated: bool = False):
+             anchors=backtest.TUNING_ANCHORS, calibrated: bool = False,
+             model: str = "bolt", cross_learning: bool = False):
     sales, in_stock, master = vn2data.sales_full(), vn2data.in_stock(), vn2data.master()
     folds = backtest.make_folds(anchors)
     rows, fold_rows = [], []
@@ -52,6 +53,10 @@ def vn2_grid(quantiles: list[float], scales: list[float], coverages: list[float]
             # not re-forecast.
             if calibrated:
                 forecaster_fn = backtest.cache_forecasts(forecaster.calibrated_chronos())
+            elif model == "chronos2":
+                forecaster_fn = backtest.cache_forecasts(
+                    forecaster.chronos2(quantile=quantile, cross_learning=cross_learning)
+                )
             else:
                 forecaster_fn = backtest.cache_forecasts(
                     forecaster.chronos(quantile=quantile, scale=scale)
@@ -133,6 +138,10 @@ def main() -> int:
     parser.add_argument("--anchors", default="tuning", choices=["tuning", "evaluation"])
     parser.add_argument("--calibrated", action="store_true",
                         help="per-series causal bias correction instead of a global scale")
+    parser.add_argument("--model", default="bolt", choices=["bolt", "chronos2"],
+                        help="which Chronos checkpoint the VN2 grid uses")
+    parser.add_argument("--cross-learning", action="store_true",
+                        help="forecast all series in one joint pass (Chronos-2 only)")
     parser.add_argument("--tag", default=None)
     args = parser.parse_args()
 
@@ -144,7 +153,8 @@ def main() -> int:
     anchor_sets = {"tuning": backtest.TUNING_ANCHORS, "evaluation": backtest.EVALUATION_ANCHORS}
     if args.task == "vn2":
         results, folds = vn2_grid(quantiles, scales, coverages, anchor_sets[args.anchors],
-                                  calibrated=args.calibrated)
+                                  calibrated=args.calibrated, model=args.model,
+                                  cross_learning=args.cross_learning)
     else:
         results, folds = vn1_grid(quantiles, scales), None
 

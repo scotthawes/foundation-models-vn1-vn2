@@ -45,9 +45,15 @@ VN2 scored inventory cost over eight played weeks, with a published benchmark of
 | arm | score (EUR, lower better) |
 | --- | ---: |
 | `seasonal_ma` at coverage 3.5 | **3,915.0** |
-| Chronos at coverage 3.5 | 4,237.2 |
+| Chronos-2, cross-learning, q=0.6, coverage 3.0 | 4,077.2 |
+| Chronos-Bolt at coverage 3.5 | 4,237.2 |
 | TabPFN (API, raw targets) | 4,252.2 |
 | benchmark (the competition's own policy) | 4,334.0 |
+
+Chronos-2 — the model that won VN1 — also beat the benchmark here and improved on Bolt by 160 EUR,
+but lost to the moving average by 162 EUR. The ordering held on all three boards (tuning 4,626 vs
+4,365; evaluation 6,013 vs 5,740; competition 4,077 vs 3,915), which is stronger evidence than any
+single window.
 
 The harness reproduces the benchmark exactly (913.8 setup + 4,334.0), which is what licenses every
 other number here.

@@ -33,6 +33,7 @@ ARMS = {
     "naive_mean": forecaster.naive_mean,
     "seasonal_naive": forecaster.seasonal_naive,
     "chronos": forecaster.chronos,
+    "chronos2": forecaster.chronos2,
     "tabpfn_api": forecaster.tabpfn_api,
 }
 
@@ -41,8 +42,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--arms", default="benchmark,seasonal_ma,chronos,tabpfn_api")
     parser.add_argument("--coverage", type=float, default=3.5)
+    parser.add_argument("--chronos2-quantile", type=float, default=0.5,
+                        help="quantile for the Chronos-2 arm, if it is in --arms")
     parser.add_argument("--tag", default="competition")
     args = parser.parse_args()
+
+    # Chronos-2 is built with cross-learning, which is what the tuning grid tested.
+    ARMS["chronos2"] = lambda: forecaster.chronos2(
+        quantile=args.chronos2_quantile, cross_learning=True
+    )
 
     arm_names = [a.strip() for a in args.arms.split(",") if a.strip()]
     unknown = [a for a in arm_names if a not in ARMS]
