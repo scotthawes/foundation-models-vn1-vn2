@@ -105,8 +105,13 @@ def tabpfn_api(
     return forecaster
 
 
-def chronos(context_weeks: int | None = 152, horizon: int = HORIZON):
-    """Chronos-Bolt-small, one sequence per series, blind to price and to the other series."""
+def chronos(context_weeks: int | None = 152, horizon: int = HORIZON, batch_size: int = 2_000):
+    """Chronos-Bolt-small, one sequence per series, blind to price and to the other series.
+
+    The batch is bounded: 15,053 series in one tensor would not fit the 3.73 GB MPS budget, and the
+    pilot is meant to scale. Batching changes nothing about the numbers — each series is forecast
+    from its own context either way.
+    """
     pipeline = None
 
     def forecaster(sales: pd.DataFrame, price: pd.DataFrame) -> pd.DataFrame:
@@ -119,13 +124,17 @@ def chronos(context_weeks: int | None = 152, horizon: int = HORIZON):
             pipeline = _load("amazon/chronos-bolt-small")
 
         context = sales if context_weeks is None else sales.iloc[:, -context_weeks:]
-        tensor = torch.tensor(context.to_numpy(dtype=np.float32))
-        with torch.no_grad():
-            forecast = pipeline.predict(tensor, prediction_length=horizon)
-        values = np.asarray(forecast, dtype=float)
-        if values.ndim == 3:  # (batch, quantiles, horizon): the median is the 0.5 quantile
-            values = np.median(values, axis=1)
-        values = np.clip(values.reshape(len(sales), horizon), 0.0, None)
+        pieces = []
+        for start in range(0, len(context), batch_size):
+            chunk = context.iloc[start : start + batch_size]
+            tensor = torch.tensor(chunk.to_numpy(dtype=np.float32))
+            with torch.no_grad():
+                forecast = pipeline.predict(tensor, prediction_length=horizon)
+            values = np.asarray(forecast, dtype=float)
+            if values.ndim == 3:  # (batch, quantiles, horizon): the median is the 0.5 quantile
+                values = np.median(values, axis=1)
+            pieces.append(values.reshape(len(chunk), horizon))
+        values = np.clip(np.concatenate(pieces, axis=0), 0.0, None)
         return _frame(values, sales, horizon)
 
     return forecaster

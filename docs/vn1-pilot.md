@@ -79,20 +79,52 @@ The trend features made it **worse by 0.06**. The hypothesis is rejected: the ab
 already carries the level, and the extra ratios pushed the forecast the wrong way. TabPFN's deficit
 on this task is not a missing-feature problem.
 
+## Full population (15,053 series)
+
+The winner was scaled, and the sample turned out to flatter it:
+
+| arm | validation | final (Phase 1) |
+| --- | ---: | ---: |
+| `chronos` | 0.5223 | **0.6123** |
+| `ma12` | **0.5163** | 0.6597 |
+| `naive_last` | 0.5247 | 0.6882 |
+
+On the 500-series sample Chronos led MA12 by 0.073 on validation (0.4106 against 0.4836). On all
+15,053 series the validation origin is a tie (0.5223 against 0.5163): the sample over-weighted
+high-volume series, and the full population is mostly dormant ones where a flat zero-ish MA12 is
+hard to beat and a sequence model still predicts movement.
+
+On the weeks that were actually scored, Chronos wins by 0.047 and the decomposition says it is
+accuracy, not bias:
+
+| arm | score | WAPE | bias | mean forecast | mean actual |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `chronos` | 0.6123 | 0.5013 | -0.1110 | 17.74 | 19.96 |
+| `ma12` | 0.6597 | 0.5420 | -0.1177 | 17.61 | 19.96 |
+
+That is the result of the exercise: **a time-series foundation model beats the organisers' MA12
+baseline on the played weeks by about 7% relative, with essentially the same bias.** It is a modest
+edge, and it does not appear on the validation origin, so it is one window's evidence rather than a
+robust win.
+
+TabPFN was not scaled. It was last on every configuration tried and the question the pilot set out
+to answer — whether there is signal worth scaling — was answered by Chronos.
+
 ## What this does and does not show
 
-- It shows a **signal worth pursuing**: on a pure forecast metric, Chronos beats the organisers'
-  baseline by 0.09 on the full population (0.569 vs 0.660), and by 0.07 on the 500-series sample.
-- It does not establish why TabPFN lags. Two explanations were tested — context size (helped, not
-  enough) and trend information (hurt) — and neither closes the gap. What remains untested is a
-  target transform (the targets are 72% zeros) and per-series normalisation.
-- The pilot's cost is trivial: **10,000 tokens per origin** (the API minimum) for 20k training rows
-  and 6,500 predictions, so a full 15,053-series run is affordable on the free tier.
+- It shows the VN1 question is answerable and cheap: the whole full-population comparison costs no
+  API tokens, and the MA12 baseline reproduces the organisers' 0.6597 exactly.
+- It shows why pilots mislead: the 500-series sample's 0.07 Chronos lead halved at full population
+  on one origin and vanished on the other. Sampling series uniformly is not sampling *volume*
+  uniformly.
+- It does not explain TabPFN's deficit. Context size helped, trend features hurt; a target
+  transform and per-series normalisation remain untested.
+- It cannot handle censoring: VN1 has no in-stock flag, so a stock-out is indistinguishable from
+  low demand. This is a limitation of the data, not of the arms.
 
 ## Next, if it is continued
 
-1. Scale the winner, not the laggard: run Chronos and MA12 on all 15,053 series and report against
-   the organisers' 0.6597. That is the headline the pilot was sizing for.
-2. If TabPFN is revisited, the untested knobs are a target transform and per-series normalisation,
-   not more context or more estimators.
-3. Multiple seeds for the sample; a single 500-series draw is a small experiment.
+1. A second scored window would settle whether Chronos's 0.047 edge is real. The files here contain
+   only one (Phase 1), so that needs Phase 2 data.
+2. TabPFN's untested knobs are a log1p target (72% of cells are zero) and per-series normalisation.
+3. Multiple seeds, and stratify by volume rather than sampling series uniformly.

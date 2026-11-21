@@ -71,6 +71,7 @@ def build_arms(names: list[str], train_rows: int, trend: bool = False) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--series", type=int, default=500)
+    parser.add_argument("--all", action="store_true", help="use every series instead of a sample")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--train-rows", type=int, default=20_000)
     parser.add_argument("--trend", action="store_true",
@@ -84,7 +85,8 @@ def main() -> int:
 
     keys.load()  # the quote is authenticated and spends no tokens, but it does need the key
     sales, price, phase1 = vn1data.phase0_sales(), vn1data.phase0_price(), vn1data.phase1_sales()
-    chosen = sample_index(sales, args.series, args.seed)
+    count = len(sales) if args.all else args.series
+    chosen = sample_index(sales, count, args.seed)
     sampled = sales.loc[chosen]
     sampled_price = price.loc[chosen]
 
@@ -131,7 +133,8 @@ def main() -> int:
 
     results = pd.DataFrame(rows)
     suffix = f"-rows{args.train_rows}{'-trend' if args.trend else ''}"
-    out = Path("results") / f"vn1-pilot-{args.series}{suffix}.csv"
+    label = "all" if args.all else str(args.series)
+    out = Path("results") / f"vn1-pilot-{label}{suffix}.csv"
     out.parent.mkdir(exist_ok=True)
     results.to_csv(out, index=False)
     print(f"\nwrote {out}")
