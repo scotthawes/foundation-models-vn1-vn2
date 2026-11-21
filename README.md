@@ -90,3 +90,11 @@ The competition asks that this be cited:
 > https://supchains.com/vn2-inventory-competition/
 
 The competition data is downloaded, not redistributed: `data/` is git-ignored.
+
+## VN1 pilot (this branch)
+
+`vn1-pilot` adds a second, cleaner test of the same question: VN1 scores pure 13-week forecast
+error over 15,053 series with a price covariate, so no ordering policy hides the forecast. The
+pilot runs 500 series at two origins and reproduces the organisers' MA12 baseline (0.6597) as a
+test. Results and caveats are in [`docs/vn1-pilot.md`](docs/vn1-pilot.md); run it with
+`python3 scripts/vn1_pilot.py --series 500`.
