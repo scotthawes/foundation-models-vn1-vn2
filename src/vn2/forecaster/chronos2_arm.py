@@ -26,8 +26,19 @@ def chronos2(
     quantile: float = 0.5,
     cross_learning: bool = False,
     batch_size: int = 256,
+    normalise: bool = False,
 ) -> ForecasterFn:
+    """Chronos-2, optionally forecasting the ratio to each series' own recent level.
+
+    `normalise=True` divides every series by its trailing 13-week mean, forecasts that ratio, and
+    multiplies back. The motivation is measured: on the played weeks the raw arm forecast 0.80 of
+    realised demand in the top volume decile, while a 13-week mean was at 0.97 — the model's error is
+    a per-series level bias, and a scale-free target gives it a level the data supplies rather than
+    one it has to infer.
+    """
     pipeline = None  # loaded on first use
+    LEVEL_WEEKS = 13
+    LEVEL_FLOOR = 0.5
 
     def forecaster(
         sales: pd.DataFrame,
@@ -39,8 +50,17 @@ def chronos2(
         if pipeline is None:
             pipeline = _load("amazon/chronos-2")
 
-        demand = causal_fill(demand_estimate(sales, in_stock_df).iloc[:, -context_weeks:])
-        inputs = demand.to_numpy(dtype=np.float32)[:, None, :]  # (series, 1, weeks)
+        demand = causal_fill(demand_estimate(sales, in_stock_df))
+        if normalise:
+            level = demand.iloc[:, -LEVEL_WEEKS:].mean(axis=1).clip(lower=LEVEL_FLOOR)
+            series = (demand.iloc[:, -context_weeks:] / level.to_numpy()[:, None]).to_numpy(
+                dtype=np.float32
+            )
+        else:
+            level = None
+            series = demand.iloc[:, -context_weeks:].to_numpy(dtype=np.float32)
+
+        inputs = series[:, None, :]  # (series, 1, weeks)
         forecast = pipeline.predict(
             inputs,
             prediction_length=len(HORIZONS),
@@ -54,6 +74,9 @@ def chronos2(
         high = min(max(int(np.searchsorted(grid, q)), 1), len(grid) - 1)
         weight = (q - grid[high - 1]) / (grid[high] - grid[high - 1])
         point = stacked[:, high - 1, :] * (1 - weight) + stacked[:, high, :] * weight
+
+        if normalise:
+            point = point * level.to_numpy()[:, None]
 
         future = pd.DatetimeIndex(
             [week_offset(sales, len(sales.columns) - 1 + h) for h in HORIZONS]

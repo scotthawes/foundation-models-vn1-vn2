@@ -1,103 +1,136 @@
 # Findings
 
-Two forecasting competitions, one question: can a foundation model beat a simple baseline? The
-short answer is **yes on VN1 and no on VN2** — and the reasons are more useful than either answer.
+Four foundation models — one tabular, three time-series — against simple baselines on two
+competitions. The short version: **the time-series model won the accuracy task and lost the
+inventory task, and the reason is structural rather than a tuning failure.**
 
-## VN1: a foundation model wins the scored window
+- VN1 (forecast accuracy): **won** — Chronos-2, quantile 0.56, 46.02% against the winning entry's
+  46.37%.
+- VN2 (inventory cost): **lost** — `seasonal_ma` 3,915 € against Chronos-2's 4,077 €, with the best
+  tabular arm at 4,252 €.
 
-VN1 scored 13-week forecasts of 15,053 retail series with `MAE% + |Bias%|`, and ranked only the
-Phase 2 window (Jan-Apr 2024).
+## The models and what they can see
 
-| entry | score |
+| model | family | unit of input | absolute level? |
+|---|---|---|---|
+| TabPFN 3.5 | tabular | one row per series-week: lags, means, calendar, hierarchy, price | **yes** |
+| Chronos-Bolt-small | time-series | one sequence per series | no |
+| Chronos-2 | time-series | sequence, optionally all series jointly; 21 quantiles | no |
+| TimesFM-3 | time-series | sequence; 9 quantiles | no |
+
+The "absolute level" column is measured, not assumed. Feeding Chronos-2 an input multiplied by
+three returns a forecast multiplied by exactly 3.0000. Time-series foundation models normalise each
+series internally — that is how one model serves a bakery and a refinery — and the consequence is
+that they forecast shape, never magnitude.
+
+That single fact explains VN2. Its cost function prices the level: 1 € per lost sale against 0.2 €
+per unit held. A moving average of 13 weeks already estimates that level well (0.97 of realised
+demand in the top volume decile, which carries two-thirds of all units). A model that only knows
+shape can add trajectory information and nothing else — and blending 25% of it into the average
+moved the score by 34 €, inside a ±670 € fold spread.
+
+## VN1: how the win was found
+
+| step | score |
 | --- | ---: |
-| **Chronos-2, cross-learning, quantile 0.56 (this repo)** | **46.02** |
-| 1st — Jakub Figura and Philip Stubbs | 46.37 |
-| 2nd — Justin Furlotte | 46.57 |
-| 3rd — Arsa Nikzad | 47.58 |
-| naive forecast | 50.70 |
-| 12-week moving average | 80.46 |
+| Bolt-small, median | 51.58 |
+| Bolt + global scale 1.1 | 51.25 |
+| Bolt × naive blend | 49.35 |
+| **Chronos-2, cross-learning, q=0.55** | 46.98 |
+| **Chronos-2, cross-learning, q=0.56 (chosen on Phase 1)** | **46.02** |
+| winner — Figura & Stubbs | 46.37 |
+| TimesFM-3, q selected on Phase 1 | 53.12 |
 
-Three things produced it, in order of importance:
+Three changes, in order of importance:
 
-1. **The model.** Chronos-Bolt-small — the arm this project started with — is last of eight
-   foundation models on GIFT-Eval (mean rank 6.3); Chronos-2 is third (3.4). Switching took the score
-   from 51.58 to 46.98 with no other change.
-2. **Cross-learning.** Chronos-2 forecasts all 15,053 series in one joint pass rather than one
-   sequence at a time.
-3. **The quantile.** `MAE% + |Bias%|` makes the median wrong by construction. Selecting q on
-   Phase 1 from Chronos-2's full 21-level grid gave q=0.56, MAE 45.15 and bias −0.86 — against the
-   winner's 45.25 and +1.12.
+1. **The model.** Bolt-small is last of eight zero-shot models on GIFT-Eval (mean rank 6.3);
+   Chronos-2 is third (3.4). Switching took 51.58 → 46.98 with nothing else altered.
+2. **Cross-learning.** All 15,053 series forecast in one joint pass rather than one at a time.
+3. **The quantile.** `MAE% + |Bias%|` makes the median wrong by construction. Choosing q on Phase 1
+   from Chronos-2's 21-level grid gave q=0.56: MAE 45.15, bias −0.86, against the winner's 45.25 and
+   +1.12. The model's *accuracy* already matched the winner's; the bias term was the gap.
 
-**How much to trust it.** The margin is 0.35 points on one window, and q=0.55 scores 46.98: a
-one-hundredth change in the quantile moves the score by nearly a point. The selection was made on
-Phase 1 and Phase 2 was scored once, but Phase 2 was examined repeatedly during the search. The fair
-claim is that this configuration would have won that window, not that it would win again.
+**Caveats.** The margin is 0.35 points on one window, and q=0.55 scores 46.98 — one hundredth of a
+quantile moves the score by nearly a point. The selection was made on Phase 1 and Phase 2 was scored
+once, but Phase 2 has been examined repeatedly during the search. The claim is that this
+configuration would have won that window, not that it would win again.
 
-**What failed** (all on full population, all selected on Phase 1): blending with the naive forecast
-(49.35), global scaling (51.25), per-series causal calibration (worse), conditional LightGBM
-calibration (−33% or +20% bias depending on the loss), and TimesFM-3 — the most accurate model tested
-(MAE 42.15 against the winner's 45.25) which lost on an 11% low bias.
+## VN2: why the foundation models lost
 
-## VN2: the moving average wins
+| arm | tuning anchors | evaluation anchors | competition weeks |
+| --- | ---: | ---: | ---: |
+| `seasonal_ma` @3.5 | 4,365.3 | 5,739.8 | **3,915.0** |
+| Chronos-2, cross-learning, q=0.6, cov 3.0 | 4,626.2 | 6,013.2 | 4,077.2 |
+| Chronos-Bolt, best of sweeps | 4,858.7 | 6,855.7 | 4,237.2 |
+| TabPFN, raw targets | 4,581.0 | 6,302.1 | 4,252.2 |
+| benchmark (the competition's own) | 4,806.4 | 6,083.0 | 4,334.0 |
 
-VN2 scored inventory cost over eight played weeks, with a published benchmark of 4,334.0 EUR.
+The ordering is identical on all three boards, which is stronger evidence than the single scored
+window. The competition-week split shows why:
 
-| arm | score (EUR, lower better) |
-| --- | ---: |
-| `seasonal_ma` at coverage 3.5 | **3,915.0** |
-| Chronos-2, cross-learning, q=0.6, coverage 3.0 | 4,077.2 |
-| Chronos-Bolt at coverage 3.5 | 4,237.2 |
-| TabPFN (API, raw targets) | 4,252.2 |
-| benchmark (the competition's own policy) | 4,334.0 |
+| arm | lost sales | holding | total |
+| --- | ---: | ---: | ---: |
+| `seasonal_ma` | 1,481 | 2,434 | 3,915 |
+| Chronos-2 | 2,491 | 1,586 | 4,077 |
 
-Chronos-2 — the model that won VN1 — also beat the benchmark here and improved on Bolt by 160 EUR,
-but lost to the moving average by 162 EUR. The ordering held on all three boards (tuning 4,626 vs
-4,365; evaluation 6,013 vs 5,740; competition 4,077 vs 3,915), which is stronger evidence than any
-single window.
+The average over-stocks and the model under-stocks, and the cost ratio prices those errors five to
+one. By volume decile the pattern is sharp: in decile 9 (66.5% of units) the average forecasts 0.97
+of demand and Chronos 0.80; in the bottom decile the average is at 1.82 and Chronos 1.15. The
+average's errors land where a held unit costs 0.2 €; the model's land where a lost sale costs 1 €.
 
-The harness reproduces the benchmark exactly (913.8 setup + 4,334.0), which is what licenses every
-other number here.
+### Every VN2 lever tried
 
-**Why the foundation model loses.** Not accuracy: over the played weeks Chronos's total absolute
-error is 7,590 against the moving average's 7,648. It loses because the ordering policy is written
-for a **per-series mean** and Chronos returns a **median**: 0.79 of realised demand in aggregate
-against the average's 1.01. The bias is concentrated where the money is — decile 9 holds 66.5% of
-all units, where the average forecasts 0.97 of demand and Chronos 0.80 — so its errors land where a
-lost sale costs 1 EUR, and the average's land where a held unit costs 0.2 EUR.
+| strategy | result | verdict |
+| --- | --- | --- |
+| TabPFN, raw targets | 4,252 € competition | loses by 337 |
+| Bolt: per-week quantiles, global scale | best 4,859 tuning | loses by 494 |
+| Bolt: per-series causal calibration | 5,433 tuning | worse by 1,068 |
+| Chronos-2: quantiles 0.5–0.7, coverage 3–3.5 | best 4,626 tuning | loses by 261 |
+| Newsvendor over summed demand (0.833 fractile) | 4,856 tuning | loses by 491 |
+| Model-free bootstrap newsvendor | 4,533 tuning | loses by 168 |
+| Blend: moving average × Chronos-2 | 4,332 tuning at 75% average | 34 better, inside noise |
 
-**What failed:** per-week quantiles (the newsvendor fractile is 0.833, and every level above the
-median was worse), a global scale (trades ~0.9 MAE per point of bias removed), per-series
-calibration (three windows of history give a noisy ratio), and a correctly built newsvendor over the
-summed demand (4,856.3 on the tuning anchors, against the moving average's 4,365.3 there).
+Nothing moved the ordering. The blend wanting three-quarters of the average, and the model-free
+newsvendor losing to the average, are the two strongest signals that the missing piece is *not* the
+level-setting mechanism and *not* the forecast shape — it is the per-series allocation that a
+tabular model with absolute values could in principle learn.
 
-**Also failed, after Chronos-2 arrived:** blending the average with Chronos-2 (the optimiser chose
-75% average and scored 4,331.6 on tuning, 34 better — inside the ±670 fold spread), and an empirical
-newsvendor that bootstraps each series' own history and orders the 0.833 fractile (4,533.1 at its
-best). The first says the model adds almost nothing the average lacks; the second says the level was
-never the defect. Neither beats the average by more than noise.
+## Cross-cutting lessons
 
-## Lessons that transfer
+1. **Task fit beats model family.** The same model won one competition and lost the other. Before
+   choosing a model, ask what the metric prices: accuracy (a central forecast) or a decision (a
+   level, a stock, a threshold).
+2. **The bias term decides.** Both competitions charge for systematic error at full weight. A model
+   can tie the winner on MAE and lose by five points, or beat the benchmark and still lose to a
+   moving average.
+3. **Scale invariance is a hard constraint.** Check it in one call: multiply the input by three. If
+   the output triples, the model cannot set a level, and no calibration or quantile will change
+   that.
+4. **Benchmarks rank models, they do not predict tasks.** GIFT-Eval got the Bolt → Chronos-2 swap
+   right and also ranked TimesFM-3 first — which had the best MAE of anything tested here (42.15)
+   and the worst bias (−10.96), finishing sixth.
+5. **Subsamples mislead.** The 500-series VN1 pilot and the 2,000-series TimesFM-3 run both reported
+   orderings that reversed at full population. Full population or nothing.
 
-- **The metric decides.** VN1's bias term and VN2's cost asymmetry both punish the same thing: a
-  biased central forecast. A model can tie the winner on accuracy and lose by five points.
-- **Task fit beats model family.** VN2 needs allocation across series; VN1 needs a central forecast.
-  The same model wins one and loses the other.
-- **Benchmarks rank models, they do not predict tasks.** GIFT-Eval correctly said to leave Bolt for
-  Chronos-2, and also ranked TimesFM-3 first — which lost here on bias.
-- **Subsamples mislead.** The 500-series VN1 pilot and the 2,000-series TimesFM-3 run both reported
-  results that reversed at full population.
+## Recommendations
+
+- **Accuracy-scored forecasting:** take a high-ranked time-series model and calibrate the point
+  forecast by choosing a quantile on a held-out window. Expect the gain to be in bias, not MAE.
+- **Inventory or any level-priced decision:** a tabular model with a normalised target (the ratio
+  target that transformed VN1's tabular arm), or a tuned moving average. Do not expect a
+  scale-invariant model to supply the level.
+- **Discipline that paid off here:** pre-register the selection rule, score the held-out window
+  once, and use paired fold errors. Twice, an apparent result reversed once that was applied.
+
+## Still open
+
+- **TabPFN with a ratio target on VN2** — implemented, tested for arithmetic, pre-registered, and
+  blocked by the Prior Labs monthly quota until 2026-12-01. It is the one foundation-model route that
+  can attack the allocation defect.
+- **A second scored window for VN1** — needed to know whether the 0.35-point margin replicates; the
+  Phase 2 data for a second window is not public.
 
 ## Reproduce
 
-```bash
-git clone https://github.com/scotthawes/vn2-inventory.git && cd vn2-inventory
-scripts/fetch_data.sh                     # VN2 competition data
-scripts/fetch_vn1_official.sh             # VN1 Phase 2 actuals, winners' forecasts, official scorer
-python3 -m pytest -q                      # 33 tests
-python3 scripts/reproduce_benchmark.py    # VN2: 913.8 / 4334.0
-python3 scripts/competition_run.py        # VN2: all arms on the played weeks
-python3 scripts/vn1_win.py                # VN1: 46.02, first place on the scored window
-```
-
-VN1's data is downloaded from the competition page and cited in the README; VN2's is fetched by
-script. Neither is redistributed here.
+See the README's Quickstart. Every number above comes from a script in `scripts/` and a CSV under
+`results/` (git-ignored, regenerated on demand).
