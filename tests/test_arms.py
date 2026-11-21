@@ -85,6 +85,11 @@ def test_api_arms_fail_fast_to_a_helpful_message_without_a_key(monkeypatch, tmp_
         forecaster.timegpt()(None, None, None, None)
 
 
+def test_an_unknown_target_transform_is_refused_at_construction():
+    with pytest.raises(ValueError, match="target transform"):
+        forecaster.tabpfn_api(target="sqrt")
+
+
 def test_every_arm_is_a_factory_returning_a_callable():
     for factory in (
         forecaster.naive_mean,

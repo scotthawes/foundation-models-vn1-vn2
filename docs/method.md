@@ -176,6 +176,25 @@ The honest summary: TabPFN and Chronos both price a shelf competently, the movin
 coverage 3.5 prices it slightly better, and the foundation-model comparison is too small a signal
 for eight weeks to settle.
 
+## Amendment 2026-11-21: target representation (queued, not yet run)
+
+The VN1 pilot (`docs/vn1-pilot.md`) found that TabPFN's bad showing there was a target
+mis-specification, not a model limit: dividing each sale by its series' 13-week mean and multiplying
+back moved it from 0.8391 to 0.6219 on held-out weeks, past the organisers' baseline. VN2's TabPFN
+arm above was run on **raw targets**, so its 4,252.2 EUR may rest on the same defect.
+
+Queued for when the API quota resets (2026-12-01; the monthly 5,000,000-token cap is exhausted):
+
+1. `tabpfn_api(target="ratio")` on the **tuning anchors**, coverage 3.5, same folds — one pass, no
+   sweep, since the transform is the question and coverage was already settled.
+2. If it beats `seasonal_ma` there, the same arm on the **evaluation anchors**, once.
+3. If that holds, the **competition anchor**, once. The benchmark arm is unchanged and must still
+   score 4,334.0.
+
+The bars do not move: an arm wins only if the paired difference exceeds its fold standard error.
+A measured VN2 fit is quoted at the 10,000-token minimum, so the whole sequence costs well under
+1M tokens. This amendment was written before any of it was run.
+
 ## Costs and quota
 
 TabPFN free tier: 5M tokens/day, 20M/month, 10k-token minimum per operation, reset midnight UTC.

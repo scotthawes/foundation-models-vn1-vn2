@@ -44,8 +44,18 @@ def tabpfn_api(
     seed: int = 0,
     n_estimators: int = DEFAULT_ESTIMATORS,
     predict_batch_size: int = DEFAULT_PREDICT_BATCH,
+    target: str = "raw",
 ) -> ForecasterFn:
-    """A forecaster that fits TabPFN on the history through the Prior Labs API."""
+    """A forecaster that fits TabPFN on the history through the Prior Labs API.
+
+    `target` is the transform applied to the demand column before fitting. VN1 showed the raw level
+    is a mis-specification when series differ by orders of magnitude: a per-series ratio target
+    moved TabPFN from 0.8391 to 0.6219 on held-out weeks (`docs/vn1-pilot.md`). VN2's series span a
+    narrower range, so whether the same applies here is a question for the re-run recorded in
+    `docs/method.md`, not an assumption.
+    """
+    if target not in ("raw", "log1p", "ratio"):
+        raise ValueError(f"unknown target transform {target!r}")
 
     def forecaster(
         sales: pd.DataFrame,
@@ -64,12 +74,23 @@ def tabpfn_api(
             rows = rows.sample(n=max_train_rows, random_state=seed)
 
         features = [c for c in rows.columns if c not in META_COLUMNS]
+        asked = prediction_rows(sales, in_stock_df, master_df, horizons=HORIZONS)[features]
+
+        y = rows["target"].to_numpy(dtype=float)
+        base_test = None
+        if target == "log1p":
+            y = np.log1p(y)
+        elif target == "ratio":
+            base_train = rows["mean_13"].to_numpy(dtype=float)
+            base_test = asked["mean_13"].to_numpy(dtype=float)
+            alive = base_train > 0.5
+            y = np.where(alive, y / np.where(alive, base_train, 1.0), 0.0)
+
         model = TabPFNRegressor(
             model_path=model_path, n_estimators=n_estimators, random_state=seed
         )
-        model.fit(rows[features], rows["target"])
+        model.fit(rows[features], y)
 
-        asked = prediction_rows(sales, in_stock_df, master_df, horizons=HORIZONS)[features]
         predicted = np.concatenate(
             [
                 np.asarray(
@@ -78,6 +99,10 @@ def tabpfn_api(
                 for start in range(0, len(asked), predict_batch_size)
             ]
         )
+        if target == "log1p":
+            predicted = np.expm1(predicted)
+        elif target == "ratio":
+            predicted = predicted * np.where(base_test > 0.5, base_test, 0.0)
         predicted = np.clip(predicted, 0.0, None)  # demand cannot be negative
 
         values = predicted.reshape(len(HORIZONS), len(sales)).T  # (row, horizon)
