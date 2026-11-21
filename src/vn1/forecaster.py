@@ -131,6 +131,127 @@ def tabpfn_api(
     return forecaster
 
 
+def chronos_quantiles(context_weeks: int | None = 152, horizon: int = HORIZON,
+                      batch_size: int = 2_000):
+    """The raw nine-quantile forecast, `(series, quantiles, horizon)`, batched across series.
+
+    Computing the tensor once per origin is what makes a quantile sweep cheap: the choice of
+    quantile is a selection from this array, not another model run.
+    """
+    pipeline = None
+
+    def forecaster(sales: pd.DataFrame, price: pd.DataFrame) -> np.ndarray:
+        nonlocal pipeline
+        import torch
+
+        if pipeline is None:
+            from vn2.forecaster.chronos_arm import _load
+
+            pipeline = _load("amazon/chronos-bolt-small")
+
+        context = sales if context_weeks is None else sales.iloc[:, -context_weeks:]
+        pieces = []
+        for start in range(0, len(context), batch_size):
+            chunk = context.iloc[start : start + batch_size]
+            tensor = torch.tensor(chunk.to_numpy(dtype=np.float32))
+            with torch.no_grad():
+                forecast = pipeline.predict(tensor, prediction_length=horizon)
+            values = np.asarray(forecast, dtype=float)
+            if values.ndim != 3:
+                raise ValueError("this checkpoint did not return quantiles; use a Bolt model")
+            pieces.append(values)
+        return np.clip(np.concatenate(pieces, axis=0), 0.0, None)
+
+    return forecaster
+
+
+def timesfm3(horizon: int = HORIZON, quantile: float = 0.5, context_weeks: int | None = None):
+    """TimesFM-3 — the GIFT-Eval leader among zero-shot foundation models.
+
+    Ranked ahead of Chronos-2 and Toto-2.0 on 97 datasets by mean per-dataset rank
+    (`docs/vn1-pilot.md`). Its API takes a list of 1-D contexts and returns a point forecast plus
+    nine quantiles; `quantile` picks from those, so the same score-aware shifts can be applied.
+    """
+    model = None
+
+    def forecaster(sales: pd.DataFrame, price: pd.DataFrame) -> pd.DataFrame:
+        nonlocal model
+        if model is None:
+            from timesfm import TimesFM3Forecaster
+
+            model = TimesFM3Forecaster.from_pretrained(device="mps")
+
+        context = sales if context_weeks is None else sales.iloc[:, -context_weeks:]
+        outputs = list(
+            model.predict_batch(
+                [row for row in context.to_numpy(dtype=float)],
+                horizon=horizon,
+                return_quantiles=True,
+                make_positive=True,
+            )
+        )
+        if quantile == 0.5:
+            values = np.stack([out.forecast for out in outputs])
+        else:
+            levels = np.linspace(0.1, 0.9, 9)
+            index = int(np.argmin(np.abs(levels - quantile)))
+            values = np.stack([np.asarray(out.quantiles)[:, index] for out in outputs])
+        weeks = [sales.columns[-1] + pd.Timedelta(weeks=k) for k in range(1, horizon + 1)]
+        return pd.DataFrame(np.clip(values, 0.0, None), index=sales.index, columns=weeks)
+
+    return forecaster
+
+
+def chronos2(context_weeks: int | None = None, horizon: int = HORIZON, batch_size: int = 128,
+             cross_learning: bool = False, use_price: bool = False, quantile: float = 0.5):
+    """Chronos-2 (478 MB) — the newer checkpoint, with optional price covariates.
+
+    Two things here are not available in Bolt: `cross_learning` lets the model share information
+    across the 15,053 series in one pass, and `use_price` passes the weekly price as a past
+    covariate. Both attack the same failure the bolt model showed on VN1 — a point forecast that is
+    accurate but systematically low.
+    """
+    pipeline = None
+
+    def forecaster(sales: pd.DataFrame, price: pd.DataFrame) -> pd.DataFrame:
+        nonlocal pipeline
+        import torch
+
+        from vn2.forecaster.chronos_arm import _load, pick_quantile
+
+        if pipeline is None:
+            pipeline = _load("amazon/chronos-2")  # the base loader dispatches on the config
+
+        context = sales if context_weeks is None else sales.iloc[:, -context_weeks:]
+        values = context.to_numpy(dtype=np.float32)  # (series, weeks)
+
+        if use_price:
+            prices = price.reindex(columns=context.columns).to_numpy(dtype=np.float32)
+            inputs = [
+                {"target": values[i], "past_covariates": {"price": prices[i]}}
+                for i in range(len(values))
+            ]
+        else:
+            inputs = values[:, None, :]  # (series, 1, weeks)
+
+        forecast = pipeline.predict(inputs, prediction_length=horizon, batch_size=batch_size,
+                                    cross_learning=cross_learning)
+        # Each element is (1, n_quantiles, horizon); Chronos-2 emits 21 levels, not Bolt's 9.
+        stacked = np.stack([np.asarray(t, dtype=float).squeeze(0) for t in forecast])
+        grid = np.asarray(pipeline.quantiles, dtype=float)
+        q = float(np.clip(quantile, grid[0], grid[-1]))
+        high = int(np.searchsorted(grid, q))
+        if grid[high] == q or high == 0:
+            point = stacked[:, high, :]
+        else:
+            weight = (q - grid[high - 1]) / (grid[high] - grid[high - 1])
+            point = stacked[:, high - 1, :] * (1 - weight) + stacked[:, high, :] * weight
+        weeks = [sales.columns[-1] + pd.Timedelta(weeks=k) for k in range(1, horizon + 1)]
+        return pd.DataFrame(np.clip(point, 0.0, None), index=sales.index, columns=weeks)
+
+    return forecaster
+
+
 def chronos(context_weeks: int | None = 152, horizon: int = HORIZON, batch_size: int = 2_000,
             quantile: float = 0.5, scale: float = 1.0):
     """Chronos-Bolt-small, one sequence per series, blind to price and to the other series.

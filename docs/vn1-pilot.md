@@ -170,6 +170,29 @@ So on the weeks that actually ranked, Chronos would have placed below the naive 
 being as accurate as the winner. The lesson matches VN2's: `MAE% + |Bias%|` and a cost function both
 punish a biased central forecast, and a zero-shot median is biased by construction.
 
+## Which foundation model? GIFT-Eval, 97 datasets
+
+Chronos-Bolt-small was chosen early for convenience, not for evidence. On the independent GIFT-Eval
+benchmark — mean per-dataset rank across 97 datasets, computed here from the space's per-model
+`all_results.csv` files — it is the weakest of the eight models compared:
+
+| model | MASE rank | CRPS rank |
+| --- | ---: | ---: |
+| TimesFM-3 | **2.2** | **2.0** |
+| Toto-2.0-313m | 3.3 | 3.3 |
+| Chronos-2 | 3.4 | 3.5 |
+| TimesFM-2.5 | 4.1 | 4.0 |
+| Moirai2 | 5.3 | 5.2 |
+| Toto 1.0 base | 5.6 | 5.2 |
+| Sundial | 5.8 | 6.4 |
+| **Chronos-Bolt-small** | **6.3** | **6.3** |
+
+Source: `huggingface.co/spaces/Salesforce/GIFT-Eval/results/<model>/all_results.csv`, ranks computed
+per dataset and averaged. The caveat is real: GIFT-Eval is broad (annual to secondly, many domains),
+not intermittent weekly retail, so this ranks models rather than predicting the VN1 result. It does
+say that switching away from Bolt is the obvious first move, and it is consistent with Chronos-2
+beating Bolt on MAE in our own subsample test (39.8 vs 42.9).
+
 TabPFN could not be scaled. The ratio-target arm needs the API, and the account's monthly quota
 (5,000,000 tokens) was exhausted by the 65k-context probes: the full-population fit succeeded and
 the prediction was rejected with **HTTP 429**, reset 2026-12-01. What exists for TabPFN is the
