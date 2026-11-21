@@ -43,6 +43,7 @@ def prepare(
     lookback: int = 52,
     step: int = 4,
     horizon: int = HORIZON,
+    trend: bool = False,
 ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame]:
     """The exact tables the TabPFN arm is fitted and asked on.
 
@@ -51,11 +52,11 @@ def prepare(
     request.
     """
     anchors = train_anchors(sales.shape[1], lookback=lookback, step=step, horizon=horizon)
-    rows = training_rows(sales, price, anchors, horizon=horizon)
+    rows = training_rows(sales, price, anchors, horizon=horizon, trend=trend)
     if len(rows) > max_train_rows:
         rows = rows.sample(n=max_train_rows, random_state=0)
 
-    asked = prediction_rows(sales, price, horizon=horizon)
+    asked = prediction_rows(sales, price, horizon=horizon, trend=trend)
     for col in IDENTIFIERS:  # the API takes categoricals natively; labels, not magnitudes
         rows[col] = rows[col].astype(str).astype("category")
         asked[col] = asked[col].astype(str).astype("category")
@@ -70,6 +71,7 @@ def tabpfn_api(
     lookback: int = 52,
     step: int = 4,
     predict_batch_size: int = 2_000,
+    trend: bool = False,
 ):
     """TabPFN through the Prior Labs API, on the lag/price/hierarchy table."""
 
@@ -82,7 +84,7 @@ def tabpfn_api(
 
         X_train, y_train, X_test = prepare(
             sales, price, max_train_rows=max_train_rows, lookback=lookback, step=step,
-            horizon=horizon,
+            horizon=horizon, trend=trend,
         )
         model = TabPFNRegressor(
             model_path="v3.5_default", n_estimators=n_estimators, random_state=0

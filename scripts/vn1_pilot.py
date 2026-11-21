@@ -52,12 +52,12 @@ def evaluate(forecaster, history: pd.DataFrame, price: pd.DataFrame, actual: pd.
     return score(prediction, actual), elapsed
 
 
-def build_arms(names: list[str], train_rows: int) -> dict:
+def build_arms(names: list[str], train_rows: int, trend: bool = False) -> dict:
     """Every arm takes `(history, price)`; the cheap ones ignore the price frame."""
     arms = {}
     for name in names:
         if name == "tabpfn_api":
-            arms[name] = vn1f.tabpfn_api(max_train_rows=train_rows)
+            arms[name] = vn1f.tabpfn_api(max_train_rows=train_rows, trend=trend)
         elif name == "chronos":
             arms[name] = vn1f.chronos()
         elif hasattr(vn1f, name):
@@ -73,6 +73,8 @@ def main() -> int:
     parser.add_argument("--series", type=int, default=500)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--train-rows", type=int, default=20_000)
+    parser.add_argument("--trend", action="store_true",
+                        help="add scale-free trend features to the tabular arm")
     parser.add_argument("--arms", default="ma12,naive_last,tabpfn_api,chronos")
     parser.add_argument("--quote-only", action="store_true")
     args = parser.parse_args()
@@ -94,7 +96,7 @@ def main() -> int:
           f"{(final_actual.sum(axis=1) > 0).mean():.0%} with any Phase 1 sales")
 
     if args.quote_only:
-        X_train, _y, X_test = vn1f.prepare(sampled, sampled_price)
+        X_train, _y, X_test = vn1f.prepare(sampled, sampled_price, trend=args.trend)
         from tabpfn_client import estimate_cost
 
         quote = estimate_cost(X_train, X_test, model_version="v3.5", n_estimators=4)
@@ -103,7 +105,8 @@ def main() -> int:
               f"predict {X_test.shape[0]:,} x {X_test.shape[1]})")
         return 0
 
-    arms = build_arms([n.strip() for n in args.arms.split(",") if n.strip()], args.train_rows)
+    arms = build_arms([n.strip() for n in args.arms.split(",") if n.strip()], args.train_rows,
+                      trend=args.trend)
     rows = []
 
     # Context: the cheap arms on the whole population, one line each.
@@ -127,7 +130,8 @@ def main() -> int:
                   f"({elapsed:,.1f}s)", flush=True)
 
     results = pd.DataFrame(rows)
-    out = Path("results") / f"vn1-pilot-{args.series}.csv"
+    suffix = f"-rows{args.train_rows}{'-trend' if args.trend else ''}"
+    out = Path("results") / f"vn1-pilot-{args.series}{suffix}.csv"
     out.parent.mkdir(exist_ok=True)
     results.to_csv(out, index=False)
     print(f"\nwrote {out}")

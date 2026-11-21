@@ -64,3 +64,17 @@ def test_the_feature_snapshot_ignores_weeks_after_the_anchor():
     after = _snapshot(scrambled, scrambled_price, anchor)
 
     pd.testing.assert_frame_equal(before, after)
+
+
+def test_trend_features_are_scale_free():
+    """A series ten times larger has the same trend ratios — that is what makes them comparable."""
+    sales = vn1data.phase0_sales().iloc[:3, :80]
+    price = vn1data.phase0_price().iloc[:3, :80]
+    anchor = 60
+
+    base = _snapshot(sales, price, anchor, trend=True)
+    scaled = _snapshot(sales * 10.0, price, anchor, trend=True)
+    ratio_columns = [c for c in base.columns if c.startswith("rel_") or c == "trend_4_13"]
+
+    assert ratio_columns
+    pd.testing.assert_frame_equal(base[ratio_columns], scaled[ratio_columns])

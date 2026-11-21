@@ -64,20 +64,35 @@ Full context buys 0.086; the gap to MA12 (0.4836) is still 0.14 and to Chronos (
 Estimators make no difference at this size. So the configuration was a real defect, but fixing it
 does not change the ordering.
 
+## Trend hypothesis: tested and rejected (validation origin)
+
+The remaining explanation was that the table encodes level but no trend, so every model regresses to
+the historic mean while sales rise. Three scale-free features were added — `lag_1` and `lag_4`
+relative to the 13-week mean, and the 4-week-to-13-week mean ratio — and the full-context arm rerun:
+
+| configuration (validation) | score |
+| --- | ---: |
+| full context, no trend features | 0.6223 |
+| full context + trend ratios | 0.6824 |
+
+The trend features made it **worse by 0.06**. The hypothesis is rejected: the absolute-value table
+already carries the level, and the extra ratios pushed the forecast the wrong way. TabPFN's deficit
+on this task is not a missing-feature problem.
+
 ## What this does and does not show
 
 - It shows a **signal worth pursuing**: on a pure forecast metric, Chronos beats the organisers'
   baseline by 0.09 on the full population (0.569 vs 0.660), and by 0.07 on the 500-series sample.
-- It does not establish that TabPFN is the weaker model. One seed, one sample, raw zero-inflated
-  targets, and a feature table that encodes level but no trend. TabPFN under-forecasts everywhere
-  (12.6 against 17.4 actual), which points at the target and feature shape, not at the tabular
-  premise itself.
+- It does not establish why TabPFN lags. Two explanations were tested — context size (helped, not
+  enough) and trend information (hurt) — and neither closes the gap. What remains untested is a
+  target transform (the targets are 72% zeros) and per-series normalisation.
 - The pilot's cost is trivial: **10,000 tokens per origin** (the API minimum) for 20k training rows
   and 6,500 predictions, so a full 15,053-series run is affordable on the free tier.
 
 ## Next, if it is continued
 
-1. The remaining hypothesis is level/trend, not context size: per-series scaling or a trend feature
-   would let any model extrapolate the rising weeks instead of regressing to the historic mean.
-2. Only then scale to 15,053 series, and report the full-population score against MA12's 0.6597.
+1. Scale the winner, not the laggard: run Chronos and MA12 on all 15,053 series and report against
+   the organisers' 0.6597. That is the headline the pilot was sizing for.
+2. If TabPFN is revisited, the untested knobs are a target transform and per-series normalisation,
+   not more context or more estimators.
 3. Multiple seeds for the sample; a single 500-series draw is a small experiment.

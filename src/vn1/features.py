@@ -28,8 +28,14 @@ def train_anchors(weeks: int, lookback: int = 52, step: int = 4, horizon: int = 
     return list(range(first, last + 1, step))
 
 
-def _snapshot(sales: pd.DataFrame, price: pd.DataFrame, anchor: int) -> pd.DataFrame:
-    """One row per series, from columns `0 .. anchor` and nothing after it."""
+def _snapshot(sales: pd.DataFrame, price: pd.DataFrame, anchor: int, trend: bool = False) -> pd.DataFrame:
+    """One row per series, from columns `0 .. anchor` and nothing after it.
+
+    With `trend`, adds three scale-free features: the last and fourth-lag values relative to the
+    13-week mean, and the ratio of the 4-week to the 13-week mean. A series that is rising has
+    ratios above one whatever its absolute size, which is the thing an absolute-value table cannot
+    say — and the pilot's under-forecast points at exactly that.
+    """
     past = sales.iloc[:, : anchor + 1]
     past_price = price.iloc[:, : anchor + 1]
 
@@ -42,6 +48,12 @@ def _snapshot(sales: pd.DataFrame, price: pd.DataFrame, anchor: int) -> pd.DataF
     out["price"] = past_price.iloc[:, -1]
     out["price_mean_13"] = past_price.iloc[:, -13:].mean(axis=1)
     out["weeks_seen"] = float(past.shape[1])
+
+    if trend:
+        scale = out["mean_13"].replace(0.0, np.nan)
+        for column in ("lag_1", "lag_4"):
+            out[f"rel_{column}"] = out[column] / scale
+        out["trend_4_13"] = out["mean_4"] / scale
     return out.reset_index()
 
 
@@ -58,13 +70,14 @@ def training_rows(
     price: pd.DataFrame,
     anchors: list[int],
     horizon: int = HORIZON,
+    trend: bool = False,
 ) -> pd.DataFrame:
     """Every (anchor, horizon, series) row with its target; call the trainer's sampler to shrink it."""
     if not anchors:
         raise ValueError("no training anchors: the history is shorter than a lag plus a horizon")
     frames = []
     for anchor in anchors:
-        base = _snapshot(sales, price, anchor)
+        base = _snapshot(sales, price, anchor, trend=trend)
         for h in range(1, horizon + 1):
             block = _calendar(base.copy(), sales.columns[anchor + h])
             block["h"] = h
@@ -77,9 +90,10 @@ def prediction_rows(
     sales: pd.DataFrame,
     price: pd.DataFrame,
     horizon: int = HORIZON,
+    trend: bool = False,
 ) -> pd.DataFrame:
     """The same features at the last known week, with no target: what the model is asked now."""
-    base = _snapshot(sales, price, sales.shape[1] - 1)
+    base = _snapshot(sales, price, sales.shape[1] - 1, trend=trend)
     frames = []
     for h in range(1, horizon + 1):
         week = sales.columns[-1] + pd.Timedelta(weeks=h)
