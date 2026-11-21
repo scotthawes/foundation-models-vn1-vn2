@@ -209,6 +209,36 @@ python3 scripts/backtest.py --anchors tuning --arms benchmark,seasonal_ma,tabpfn
     --coverages 3.5 --target ratio --tag tuning-ratio
 ```
 
+## Amendment 2026-11-21 (2): does Chronos have a lever the average lacks?
+
+Chronos was compared at the median forecast and a coverage tuned separately. VN2's costs are
+asymmetric — 1 EUR per lost sale against 0.2 EUR per unit held — so the cost-minimising stock level
+is the 0.833 quantile of demand, a level the median cannot express and a moving average cannot
+produce at all. The arm now exposes both levers (`quantile`, `scale`).
+
+**Pre-registered selection rule**, written before the grid ran:
+
+1. Sweep `quantile ∈ {0.5, 0.7, 0.8, 0.9}` × `scale ∈ {1.0, 1.1}` × `coverage ∈ {3, 3.5, 4}` on the
+   **tuning anchors**.
+2. Take the single best cell by mean score. That is the configuration, chosen once.
+3. Report it on the **evaluation anchors**, one run. It counts as beating the moving average only if
+   the paired difference over folds exceeds its standard error, and only if it also beats
+   `seasonal_ma` at the same coverage.
+4. If it holds, play the **competition anchor** once.
+
+No cell shopping: a second-best cell is not reported as the result. VN1 gets the mirror test on its
+validation origin (median is correct there — the score has no cost asymmetry — so only `scale` is a
+free parameter), with one check on the final weeks.
+
+**Result.** No cell beat the existing configuration: the best of the pre-registered grid was median,
+scale 1, coverage 3.5 at 4,858.7 on tuning, and every higher quantile was worse. A labelled
+post-hoc grid testing the true newsvendor shape (high quantile, short coverage) found quantile 0.6
+at coverage 3.0 → 4,809.9 on tuning, and 6,828.4 on the evaluation anchors against `seasonal_ma`'s
+5,739.8 — worse by 1,088.6 ± 497.0 (t 2.19). Per the rule above, the competition anchor was not
+played. On VN1 the mirror test found scale 1.1 → 0.5502 on the scored weeks against MA12's 0.6597, a
+win on both origins. The full write-up, tables and the reason the tasks differ is
+[`docs/chronos-vs-baseline.md`](chronos-vs-baseline.md).
+
 ## Costs and quota
 
 TabPFN free tier: 5M tokens/day, 20M/month, 10k-token minimum per operation, reset midnight UTC.

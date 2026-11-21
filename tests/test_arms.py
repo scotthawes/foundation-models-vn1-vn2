@@ -90,6 +90,16 @@ def test_an_unknown_target_transform_is_refused_at_construction():
         forecaster.tabpfn_api(target="sqrt")
 
 
+def test_pick_quantile_hits_grid_points_and_interpolates_between_them():
+    from vn2.forecaster.chronos_arm import pick_quantile
+
+    values = np.arange(9, dtype=float).reshape(1, 9, 1)  # quantile 0.1 carries 0.0, 0.9 carries 8.0
+    assert pick_quantile(values, 0.5)[0, 0] == 4.0
+    assert pick_quantile(values, 0.8)[0, 0] == 7.0
+    assert pick_quantile(values, 0.75)[0, 0] == pytest.approx(6.5)  # halfway between 0.7 and 0.8
+    assert pick_quantile(values, 0.99)[0, 0] == 8.0  # clipped to the top of the grid
+
+
 def test_the_ratio_target_round_trips_and_dead_series_stay_zero():
     """The arithmetic that the queued VN2 run will depend on, tested before it spends quota."""
     from vn2.forecaster.tabpfn_api_arm import _from_ratio, _to_ratio

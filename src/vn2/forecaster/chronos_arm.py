@@ -21,6 +21,24 @@ from ..play import ForecasterFn
 DEFAULT_MODEL = "amazon/chronos-bolt-small"
 DEFAULT_CONTEXT_WEEKS = 152  # two years, and the most Chronos takes without truncating
 CENSOR_FILL_WINDOW = 13
+QUANTILES = tuple(round(0.1 * k, 1) for k in range(1, 10))  # what Chronos-Bolt emits
+
+
+def pick_quantile(values: np.ndarray, quantile: float) -> np.ndarray:
+    """Take one quantile out of a (batch, 9, horizon) forecast, interpolating between grid points.
+
+    The ordering policy has no distribution of its own, so which quantile it is fed decides the
+    service level. VN2 charges 1 EUR per lost sale and 0.2 EUR per unit held, so the newsvendor
+    critical fractile is 1/(1+0.2) = 0.833 — a quantile the median cannot express.
+    """
+    grid = np.asarray(QUANTILES)
+    q = float(np.clip(quantile, grid[0], grid[-1]))
+    if q in grid:
+        return values[:, int(np.where(grid == q)[0][0]), :]
+    high = int(np.searchsorted(grid, q))
+    low = high - 1
+    weight = (q - grid[low]) / (grid[high] - grid[low])
+    return values[:, low, :] * (1.0 - weight) + values[:, high, :] * weight
 
 
 def causal_fill(series: pd.DataFrame) -> pd.DataFrame:
@@ -42,8 +60,15 @@ def chronos(
     model_name: str = DEFAULT_MODEL,
     context_weeks: int = DEFAULT_CONTEXT_WEEKS,
     horizon: int = len(HORIZONS),
+    quantile: float = 0.5,
+    scale: float = 1.0,
 ) -> ForecasterFn:
-    """A zero-shot Chronos forecaster. The model is loaded once and shared by every call."""
+    """A zero-shot Chronos forecaster. The model is loaded once and shared by every call.
+
+    `quantile` picks which of the nine predicted quantiles becomes the forecast the policy sees,
+    and `scale` multiplies it afterwards. Both default to the plain median, which is what the
+    original comparison used; the grid in `scripts/chronos_grid.py` is what varies them.
+    """
     pipeline = None  # loaded on first use: importing this module must not download weights
 
     def forecaster(
@@ -61,9 +86,14 @@ def chronos(
         with torch_no_grad():
             forecast = pipeline.predict(context, prediction_length=horizon)
         values = np.asarray(forecast, dtype=float)
-        if values.ndim == 3:  # (batch, samples, horizon): take the median over draws
-            values = np.median(values, axis=1)
-        values = np.clip(values.reshape(len(sales), horizon), 0.0, None)
+        if values.ndim == 3:
+            # Bolt emits quantiles; the classic model emits samples. Only the former has a quantile
+            # axis to pick from, and `_load` returns the class that matches the checkpoint.
+            if hasattr(pipeline, "quantiles"):
+                values = pick_quantile(values, quantile)
+            else:
+                values = np.median(values, axis=1)  # median forecast of the sample paths
+        values = np.clip(values.reshape(len(sales), horizon) * scale, 0.0, None)
 
         future = pd.DatetimeIndex(
             [week_offset(sales, len(sales.columns) - 1 + h) for h in range(1, horizon + 1)]

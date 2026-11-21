@@ -131,12 +131,16 @@ def tabpfn_api(
     return forecaster
 
 
-def chronos(context_weeks: int | None = 152, horizon: int = HORIZON, batch_size: int = 2_000):
+def chronos(context_weeks: int | None = 152, horizon: int = HORIZON, batch_size: int = 2_000,
+            quantile: float = 0.5, scale: float = 1.0):
     """Chronos-Bolt-small, one sequence per series, blind to price and to the other series.
 
     The batch is bounded: 15,053 series in one tensor would not fit the 3.73 GB MPS budget, and the
     pilot is meant to scale. Batching changes nothing about the numbers — each series is forecast
     from its own context either way.
+
+    VN1's score has no cost asymmetry (absolute error plus bias), so the median is the right choice
+    here; `quantile` and `scale` exist so the same calibration question can be asked as on VN2.
     """
     pipeline = None
 
@@ -157,10 +161,15 @@ def chronos(context_weeks: int | None = 152, horizon: int = HORIZON, batch_size:
             with torch.no_grad():
                 forecast = pipeline.predict(tensor, prediction_length=horizon)
             values = np.asarray(forecast, dtype=float)
-            if values.ndim == 3:  # (batch, quantiles, horizon): the median is the 0.5 quantile
-                values = np.median(values, axis=1)
-            pieces.append(values.reshape(len(chunk), horizon))
-        values = np.clip(np.concatenate(pieces, axis=0), 0.0, None)
+            if values.ndim == 3:  # (batch, quantiles, horizon)
+                if hasattr(pipeline, "quantiles"):
+                    from vn2.forecaster.chronos_arm import pick_quantile
+
+                    values = pick_quantile(values, quantile)
+                else:
+                    values = np.median(values, axis=1)
+            pieces.append(np.clip(values.reshape(len(chunk), horizon) * scale, 0.0, None))
+        values = np.concatenate(pieces, axis=0)
         return _frame(values, sales, horizon)
 
     return forecaster
