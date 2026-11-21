@@ -130,6 +130,46 @@ baseline on the played weeks by about 7% relative, with essentially the same bia
 edge, and it does not appear on the validation origin, so it is one window's evidence rather than a
 robust win.
 
+## Phase 2: against the actual winners
+
+The official bundle (`data/raw/vn1-official/`, git-ignored) contains Phase 2's actuals, the official
+scorer, and **the five winning forecasts**. Scoring them reproduces the published leaderboard
+exactly, and the same scorer puts our arms in the same table:
+
+| entry | score | MAE% | bias% |
+| --- | ---: | ---: | ---: |
+| 1st — Jakub Figura & Philip Stubbs | **46.37** | 45.25 | +1.12 |
+| 2nd — Justin Furlotte | 46.57 | — | — |
+| 3rd — Arsa Nikzad | 47.58 | — | — |
+| 4th — Antoine Schwartz | 47.74 | — | — |
+| 5th — An Hoang | 48.08 | — | — |
+| naive forecast | 50.70 | — | — |
+| **Chronos, median** | 51.58 | **45.36** | -6.22 |
+| Chronos, scale 1.1 (tuned on Phase 1) | 51.25 | 48.09 | +3.15 |
+| Chronos, scaled by Phase 1's bias (1.125) | 54.52 | 49.04 | +5.49 |
+| old R submission (`rf_submission.csv`) | 53.53 | 50.95 | -2.58 |
+| 12-week moving average | 80.46 | — | — |
+
+Three things follow.
+
+**Chronos matched the winner on accuracy and lost on bias.** Its MAE is 45.36% against the winner's
+45.25% — a tie — but the score is `MAE% + |bias|`, and a median forecast of right-skewed demand
+carries a −6.2% bias. That single term is the whole 5.2-point gap.
+
+**Bias corrections do not transfer across windows.** Phase 1's out-of-sample bias was −11.1%, so the
+causal correction was 1.125; Phase 2's bias was only −6.2%, so that correction overshot to +5.5% and
+made the score worse than doing nothing. A scale tuned on Phase 1's validation splits (1.1) was the
+best calibrated variant at 51.25 — still behind the naive forecast.
+
+**The winners' method was not a foundation model.** Vandeput's post-competition interviews report
+LightGBM as the most-used model at the top, with most entrants ensembling several models or runs;
+half wrote under 300 lines and nearly all ran in under 10 minutes. The winning edge was a fast,
+robust evaluation loop and a bias-controlled point forecast, not a larger model.
+
+So on the weeks that actually ranked, Chronos would have placed below the naive forecast — despite
+being as accurate as the winner. The lesson matches VN2's: `MAE% + |Bias%|` and a cost function both
+punish a biased central forecast, and a zero-shot median is biased by construction.
+
 TabPFN could not be scaled. The ratio-target arm needs the API, and the account's monthly quota
 (5,000,000 tokens) was exhausted by the 65k-context probes: the full-population fit succeeded and
 the prediction was rejected with **HTTP 429**, reset 2026-12-01. What exists for TabPFN is the
@@ -155,8 +195,11 @@ this pilot set out to price and did not get.
 
 1. When the token quota resets (2026-12-01) or is raised, run the ratio-target arm on all 15,053
    series: at the measured 50,723 tokens per origin it costs little, and it is the missing row.
-2. A second scored window would settle whether Chronos's 0.047 edge is real. The files here contain
-   only one (Phase 1), so that needs Phase 2 data.
+2. The Phase 2 comparison above settles the second window: Chronos's Phase 1 edge did not transfer.
+   What remains unanswered is whether a **bias-controlled** variant — a per-series correction
+   estimated from rolling windows rather than a global scale — could reach the winners' 46.4%. The
+   winner's MAE is within 0.11 points of Chronos's, so the gap is bias, and bias is what LightGBM
+   ensembles get right by construction.
 3. Multiple seeds, and stratify by volume rather than sampling series uniformly — the pilot's
    sample-bias lesson.
 

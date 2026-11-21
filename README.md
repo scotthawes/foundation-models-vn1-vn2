@@ -93,10 +93,13 @@ tests/           benchmark pins, leakage pins, arm frame tests
 
 ## Citation
 
-The competition asks that this be cited:
+Both competitions ask that their data be cited:
 
 > Vandeput, N. (2025). VN2 Inventory Planning Challenge.
 > https://supchains.com/vn2-inventory-competition/
+
+> Vandeput, N. (2024). VN1 Forecasting Competition.
+> https://supchains.com/vn1-forecasting-competition/
 
 The competition data is downloaded, not redistributed: `data/` is git-ignored.
 
@@ -104,9 +107,9 @@ The competition data is downloaded, not redistributed: `data/` is git-ignored.
 
 `vn1-pilot` adds a second, cleaner test of the same question: VN1 scores pure 13-week forecast
 error over 15,053 series with a price covariate, so no ordering policy hides the forecast. It
-reproduces the organisers' MA12 baseline (0.6597) as a test, and on the scored weeks Chronos beats
-that baseline (0.6123). TabPFN reaches 0.6219 on a 500-series sample once its target is normalised
-(0.8391 raw), but could not be scaled to the full population because the API quota ran out.
-Results, the target-shape finding and the sample-bias lesson are in
+reproduces the organisers' MA12 baseline (0.6597) as a test. On Phase 1 Chronos beats that baseline
+(0.5502 vs 0.6597); on **Phase 2, the window that actually ranked**, Chronos scores 51.25% against
+the winner's 46.37% and the naive forecast's 50.70% — its MAE ties the winner's, but its median bias
+costs five points. Results, the winners' methods and the sample-bias lesson are in
 [`docs/vn1-pilot.md`](docs/vn1-pilot.md); run it with `python3 scripts/vn1_pilot.py --series 500`
 or `--all`.
