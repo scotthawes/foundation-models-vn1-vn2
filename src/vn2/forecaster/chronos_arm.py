@@ -103,6 +103,41 @@ def chronos(
     return forecaster
 
 
+def chronos_quantiles(
+    model_name: str = DEFAULT_MODEL,
+    context_weeks: int = DEFAULT_CONTEXT_WEEKS,
+    horizon: int = len(HORIZONS),
+):
+    """The raw nine-quantile forecast, `(series, quantiles, horizon)`, for distributional policies.
+
+    `chronos` collapses this to a point forecast; the newsvendor policy in `vn2.level_policy` needs
+    the spread instead, because the stock level depends on the quantile of the summed demand rather
+    than on any single week's forecast.
+    """
+    pipeline = None
+
+    def forecaster(
+        sales: pd.DataFrame,
+        in_stock_df: pd.DataFrame,
+        master_df: pd.DataFrame,
+        state: pd.DataFrame,
+    ) -> np.ndarray:
+        nonlocal pipeline
+        if pipeline is None:
+            pipeline = _load(model_name)
+
+        demand = causal_fill(demand_estimate(sales, in_stock_df).iloc[:, -context_weeks:])
+        context = torch_tensor(demand.to_numpy(dtype=np.float32))
+        with torch_no_grad():
+            forecast = pipeline.predict(context, prediction_length=horizon)
+        values = np.asarray(forecast, dtype=float)
+        if values.ndim == 2:  # a point forecast cannot support a quantile policy
+            raise ValueError("this checkpoint did not return quantiles; use a Bolt model")
+        return np.clip(values, 0.0, None)
+
+    return forecaster
+
+
 def _load(model_name: str):
     """Load through the base class, which dispatches on the config's `chronos_pipeline_class`.
 

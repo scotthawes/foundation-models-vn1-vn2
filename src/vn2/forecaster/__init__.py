@@ -19,6 +19,7 @@ from .seasonal import seasonal_moving_average
 __all__ = [
     "calibrated_chronos",
     "chronos",
+    "chronos_quantiles",
     "naive_mean",
     "seasonal_moving_average",
     "seasonal_naive",
@@ -45,6 +46,13 @@ def chronos(**kwargs):
 def calibrated_chronos(**kwargs):
     """Chronos with a causal per-series bias correction; see `vn2.forecaster.chronos_arm`."""
     from .chronos_arm import calibrated_chronos as factory
+
+    return factory(**kwargs)
+
+
+def chronos_quantiles(**kwargs):
+    """The raw nine-quantile Chronos forecast; see `vn2.forecaster.chronos_arm`."""
+    from .chronos_arm import chronos_quantiles as factory
 
     return factory(**kwargs)
 

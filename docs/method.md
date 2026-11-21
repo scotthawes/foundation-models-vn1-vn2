@@ -246,6 +246,28 @@ fell below one, so stock was redistributed rather than raised where demand was. 
 last zero-shot lever; the remaining route is a model fitted to VN2's cost function, which is a
 different kind of comparison.
 
+## Amendment 2026-11-21 (3): order to the quantile of the summed demand
+
+The quantile experiment above was theoretically wrong: it added three and a half weeks of per-week
+quantiles, and the sum of quantiles is not the quantile of the sum. `vn2.level_policy` fixes that —
+it samples demand paths from Chronos's nine per-week quantiles (256 draws, independent across
+weeks), sums each path over the coverage window, and orders to the 0.833 quantile of those totals,
+the newsvendor fractile implied by 1 EUR lost against 0.2 EUR held.
+
+**Pre-registered rule, before the grid ran:** sweep `service ∈ {0.7, 0.833, 0.9}` ×
+`coverage ∈ {2, 2.5, 3, 3.5}` on the tuning anchors; if the best cell beats `seasonal_ma` (4,365.3)
+there by more than its fold standard error, run the evaluation anchors once, and the competition
+anchor once if that holds. The independence assumption across weeks is stated in the module and
+understates the spread of the sum; the service sweep is there so the conclusion does not rest on
+it.
+
+**Result.** The best cell was coverage 2.5 at service 0.7 → 4,856.3, within 2.4 EUR of the plain
+median configuration and 491 behind `seasonal_ma`; the theoretically implied 0.833 was worse
+(4,972.9). Per the rule, neither the evaluation nor the competition anchor was run. Together with the
+scale and calibration results, this shows the aggregate level was never the binding constraint —
+Chronos tops out around 4,850-4,950 on tuning regardless of how the level is set, and the gap to the
+moving average is in how stock is allocated across series.
+
 ## Costs and quota
 
 TabPFN free tier: 5M tokens/day, 20M/month, 10k-token minimum per operation, reset midnight UTC.

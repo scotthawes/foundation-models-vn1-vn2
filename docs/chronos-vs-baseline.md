@@ -96,9 +96,34 @@ eight-week-ahead forecasts are a thin basis for a per-series ratio.
 Calibration adds stock and does not buy service: at coverage 3.5 it costs 664 EUR more in holding
 and removes only 80 lost sales, because the uplift goes to series whose ratio was estimated from
 noise while the high-volume series are corrected slightly or, for the 37% with a ratio below one,
-downward. The mismatch is structural, not a tuning failure: the policy needs a per-series mean, and
-a zero-shot median scaled by noisy ratios is not one. A model fitted to this task — fine-tuned, or
-a quantile forecast evaluated against the actual cost function — is the only route left, and it is
+downward.
+
+**The correct newsvendor level does not help either.** The per-week quantile attempt summed
+quantiles, which is not the quantile of the total. `vn2.level_policy` does it properly: sample 256
+demand paths from the nine per-week quantiles, sum each path over the coverage window, order the
+0.833 quantile of the totals. On the tuning anchors:
+
+| coverage | service 0.7 | service 0.833 | service 0.9 |
+| ---: | ---: | ---: | ---: |
+| 2.0 | 5,285.3 | 5,064.3 | 5,096.7 |
+| 2.5 | **4,856.3** | 4,972.9 | 5,263.8 |
+| 3.0 | 4,929.1 | — | — |
+| 3.5 | 5,377.5 | 6,228.3 | 7,042.1 |
+
+The best cell, 4,856.3, is within 2.4 EUR of the plain median configuration (4,858.7) and 491
+behind `seasonal_ma` (4,365.3). The theoretically implied service level is *worse* than a lower one.
+
+**So the aggregate level was never the binding constraint.** Every level lever — quantile, global
+scale, per-series calibration, a correctly built newsvendor — lands Chronos at roughly 4,850-4,950
+on tuning, close to the benchmark's 4,806 and consistently below the moving average. What differs is
+the *allocation across series*: the moving average is a per-series mean, so its errors are spread
+proportionally and land in cheap places, while Chronos's median carries a skew-dependent per-series
+bias that no global factor removes and that a three-window per-series estimate is too noisy to
+correct.
+
+The mismatch is structural, not a tuning failure: the policy needs a calibrated per-series mean, and
+a zero-shot median is not one. A model fitted to this task — fine-tuned on ordering outcomes, or a
+per-series model with enough history to estimate its own bias — is the only route left, and it is
 outside what a zero-shot comparison can claim.
 
 ## VN1: yes, and already at the median
