@@ -70,6 +70,12 @@ median was worse), a global scale (trades ~0.9 MAE per point of bias removed), p
 calibration (three windows of history give a noisy ratio), and a correctly built newsvendor over the
 summed demand (4,856.3 on the tuning anchors, against the moving average's 4,365.3 there).
 
+**Also failed, after Chronos-2 arrived:** blending the average with Chronos-2 (the optimiser chose
+75% average and scored 4,331.6 on tuning, 34 better — inside the ±670 fold spread), and an empirical
+newsvendor that bootstraps each series' own history and orders the 0.833 fractile (4,533.1 at its
+best). The first says the model adds almost nothing the average lacks; the second says the level was
+never the defect. Neither beats the average by more than noise.
+
 ## Lessons that transfer
 
 - **The metric decides.** VN1's bias term and VN2's cost asymmetry both punish the same thing: a
