@@ -1,0 +1,22 @@
+[project]
+name = "vn2-inventory"
+version = "0.1.0"
+description = "Replaying the VN2 inventory competition with tabular and time-series foundation models"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.1",
+]
+
+[project.optional-dependencies]
+# The two arms being compared.
+tabpfn = ["tabpfn>=2.0"]
+tsfm = ["chronos-forecasting>=2.1"]
+# A classical gradient-boosted arm, which is what the winning VN2 teams actually used.
+gbm = ["lightgbm>=4.3"]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+# The venv lives in the primary checkout; scripts and tests must import this tree, not another.
+pythonpath = ["src"]
+testpaths = ["tests"]

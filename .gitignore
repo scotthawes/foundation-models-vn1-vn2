@@ -1,0 +1,20 @@
+# The competition data is free to download but is not ours to redistribute.
+# scripts/fetch_data.sh rebuilds it.
+data/
+
+# Runs and artefacts
+outputs/
+results/
+Orders - */
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.DS_Store
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# API keys never belong in the tree; they live in ~/.config/vn2-inventory/keys.env
+keys.env
+.env
