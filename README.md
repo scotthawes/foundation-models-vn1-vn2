@@ -1,5 +1,8 @@
 # VN2 Inventory Planning: a tabular foundation model against a time-series one
 
+**Findings: [`FINDINGS.md`](FINDINGS.md)** — both competitions, the winning VN1 configuration, and why
+VN2 went the other way.
+
 The VN2 Inventory Planning Challenge (Vandeput, 2025) hands you 599 Store x Product series and eight
 weeks to plan. The score is money: `0.2 EUR x units left on shelf + 1 EUR x lost sales`, over weeks
 3-8. The published benchmark costs **4,334.0 EUR**; the winner scored **3,763.2 EUR**.
