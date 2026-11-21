@@ -76,7 +76,7 @@ Every VN2 arm shares one ordering policy, so differences are differences in fore
 ## Reproduce
 
 ```bash
-git clone https://github.com/scotthawes/vn2-inventory.git && cd vn2-inventory
+git clone https://github.com/scotthawes/foundation-models-vn1-vn2.git && cd foundation-models-vn1-vn2
 
 scripts/fetch_data.sh              # VN2 data
 scripts/fetch_vn1_official.sh      # VN1 Phase 2 actuals, winners' forecasts, official scorer
