@@ -100,6 +100,26 @@ def test_pick_quantile_hits_grid_points_and_interpolates_between_them():
     assert pick_quantile(values, 0.99)[0, 0] == 8.0  # clipped to the top of the grid
 
 
+def test_series_ratios_are_bounded_and_one_per_series():
+    """The calibration factor must never be a wild multiplier, and never be missing."""
+    from vn2.forecaster.chronos_arm import CALIBRATION_CLIP, series_ratios
+
+    sales, in_stock = panel(rows=4, weeks=60)
+    master = pd.DataFrame(
+        {c: "x" for c in ("ProductGroup", "Division", "Department", "DepartmentGroup",
+                          "StoreFormat", "Format")},
+        index=sales.index,
+    )
+
+    def fake(history, flags, master_df, state):
+        return pd.DataFrame(1.0, index=history.index,
+                            columns=history.columns[-1] + pd.Timedelta(weeks=1) * np.arange(1, 9))
+
+    ratios = series_ratios(fake, sales, in_stock, master, None, windows=2, step=4)
+    assert len(ratios) == len(sales)
+    assert ratios.between(CALIBRATION_CLIP[0], CALIBRATION_CLIP[1]).all()
+
+
 def test_the_ratio_target_round_trips_and_dead_series_stay_zero():
     """The arithmetic that the queued VN2 run will depend on, tested before it spends quota."""
     from vn2.forecaster.tabpfn_api_arm import _from_ratio, _to_ratio

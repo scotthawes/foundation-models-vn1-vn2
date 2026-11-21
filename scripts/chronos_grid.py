@@ -41,7 +41,7 @@ def float_list(text: str) -> list[float]:
 
 
 def vn2_grid(quantiles: list[float], scales: list[float], coverages: list[float],
-             anchors=backtest.TUNING_ANCHORS):
+             anchors=backtest.TUNING_ANCHORS, calibrated: bool = False):
     sales, in_stock, master = vn2data.sales_full(), vn2data.in_stock(), vn2data.master()
     folds = backtest.make_folds(anchors)
     rows, fold_rows = [], []
@@ -50,9 +50,12 @@ def vn2_grid(quantiles: list[float], scales: list[float], coverages: list[float]
         for scale in scales:
             # One forecast per history prefix, shared by every coverage: coverage reorders, it does
             # not re-forecast.
-            forecaster_fn = backtest.cache_forecasts(
-                forecaster.chronos(quantile=quantile, scale=scale)
-            )
+            if calibrated:
+                forecaster_fn = backtest.cache_forecasts(forecaster.calibrated_chronos())
+            else:
+                forecaster_fn = backtest.cache_forecasts(
+                    forecaster.chronos(quantile=quantile, scale=scale)
+                )
             for coverage in coverages:
                 policy = play.order_up_to_policy(forecaster_fn, coverage=coverage)
                 scores = []
@@ -128,15 +131,20 @@ def main() -> int:
     parser.add_argument("--scales", default="1,1.1")
     parser.add_argument("--coverages", default="3,3.5,4")
     parser.add_argument("--anchors", default="tuning", choices=["tuning", "evaluation"])
+    parser.add_argument("--calibrated", action="store_true",
+                        help="per-series causal bias correction instead of a global scale")
     parser.add_argument("--tag", default=None)
     args = parser.parse_args()
 
     quantiles, scales, coverages = (
         float_list(args.quantiles), float_list(args.scales), float_list(args.coverages)
     )
+    if args.calibrated:  # calibration replaces the global levers; one configuration only
+        quantiles, scales = [0.5], [1.0]
     anchor_sets = {"tuning": backtest.TUNING_ANCHORS, "evaluation": backtest.EVALUATION_ANCHORS}
     if args.task == "vn2":
-        results, folds = vn2_grid(quantiles, scales, coverages, anchor_sets[args.anchors])
+        results, folds = vn2_grid(quantiles, scales, coverages, anchor_sets[args.anchors],
+                                  calibrated=args.calibrated)
     else:
         results, folds = vn1_grid(quantiles, scales), None
 

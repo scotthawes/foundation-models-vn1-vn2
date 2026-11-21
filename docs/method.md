@@ -239,6 +239,13 @@ played. On VN1 the mirror test found scale 1.1 → 0.5502 on the scored weeks ag
 win on both origins. The full write-up, tables and the reason the tasks differ is
 [`docs/chronos-vs-baseline.md`](chronos-vs-baseline.md).
 
+A further lever was added and tested after the grid: per-series causal calibration (each series'
+past realised/forecast ratio, shrunk and clipped). It made VN2 worse — 5,433.4 on tuning against
+4,858.7 — because three eight-week windows give a noisy ratio: 10% of series hit the cap and 37%
+fell below one, so stock was redistributed rather than raised where demand was. That closes the
+last zero-shot lever; the remaining route is a model fitted to VN2's cost function, which is a
+different kind of comparison.
+
 ## Costs and quota
 
 TabPFN free tier: 5M tokens/day, 20M/month, 10k-token minimum per operation, reset midnight UTC.

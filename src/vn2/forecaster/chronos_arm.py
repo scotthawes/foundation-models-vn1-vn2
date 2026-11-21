@@ -127,3 +127,85 @@ def torch_no_grad():
     import torch
 
     return torch.no_grad()
+
+
+CALIBRATION_WINDOWS = 4   # historical forecast windows used to estimate each series' bias
+CALIBRATION_STEP = 4      # weeks between those windows
+CALIBRATION_SHRINK = 2.0  # pseudo-units pulling a thin series' ratio back toward 1
+CALIBRATION_CLIP = (0.5, 2.5)
+
+
+def series_ratios(
+    forecaster: ForecasterFn,
+    sales: pd.DataFrame,
+    in_stock_df: pd.DataFrame,
+    master_df: pd.DataFrame,
+    state: pd.DataFrame,
+    windows: int = CALIBRATION_WINDOWS,
+    step: int = CALIBRATION_STEP,
+    shrink: float = CALIBRATION_SHRINK,
+    clip: tuple[float, float] = CALIBRATION_CLIP,
+) -> pd.Series:
+    """Each series' realised demand divided by what Chronos forecast for it, on past windows only.
+
+    Every window ends at or before the last week `sales` knows, so a forecast for week `t` is
+    calibrated with information from weeks before `t`. Censored weeks are excluded from both the
+    numerator and the denominator: a stock-out is not evidence about forecast bias.
+
+    The ratio is smoothed toward 1 with `shrink` pseudo-units, so a series with one small sale and a
+    forecast of 0.1 does not become a 10x multiplier, and clipped to a sane band.
+    """
+    weeks = len(sales.columns)
+    actual_total = np.zeros(len(sales))
+    forecast_total = np.zeros(len(sales))
+
+    for k in range(1, windows + 1):
+        origin = weeks - 1 - k * step  # last week the calibration forecast may know
+        if origin + 8 > weeks:
+            continue
+        history = sales.iloc[:, : origin + 1]
+        flags = in_stock_df[sales.columns[: origin + 1]]
+        state_arg = None if state is None else state.copy()
+        forecast = forecaster(history, flags, master_df.copy(), state_arg).to_numpy(dtype=float)
+        realised = demand_estimate(sales, in_stock_df).iloc[:, origin + 1 : origin + 9].to_numpy()
+
+        observed = ~np.isnan(realised)
+        actual_total += np.where(observed, realised, 0.0).sum(axis=1)
+        forecast_total += np.where(observed, forecast, 0.0).sum(axis=1)
+
+    ratio = (actual_total + shrink) / (forecast_total + shrink)
+    return pd.Series(np.clip(ratio, *clip), index=sales.index)
+
+
+def calibrated_chronos(
+    model_name: str = DEFAULT_MODEL,
+    context_weeks: int = DEFAULT_CONTEXT_WEEKS,
+    horizon: int = len(HORIZONS),
+    windows: int = CALIBRATION_WINDOWS,
+    step: int = CALIBRATION_STEP,
+    shrink: float = CALIBRATION_SHRINK,
+    clip: tuple[float, float] = CALIBRATION_CLIP,
+) -> ForecasterFn:
+    """The Chronos arm with a per-series bias correction, estimated causally from past windows.
+
+    The median forecast is a median, not a mean, and the policy orders as if it were a mean. A
+    single global scale cannot repair that — it lifts series that are already over-forecast as much
+    as those that are not (`docs/chronos-vs-baseline.md`). This corrects each series with its own
+    past forecast-to-actual ratio instead.
+    """
+    base = chronos(model_name=model_name, context_weeks=context_weeks, horizon=horizon)
+
+    def forecaster(
+        sales: pd.DataFrame,
+        in_stock_df: pd.DataFrame,
+        master_df: pd.DataFrame,
+        state: pd.DataFrame,
+    ) -> pd.DataFrame:
+        ratios = series_ratios(
+            base, sales, in_stock_df, master_df, state, windows=windows, step=step,
+            shrink=shrink, clip=clip,
+        )
+        forecast = base(sales, in_stock_df, master_df, state)
+        return forecast.mul(ratios, axis=0)
+
+    return forecaster

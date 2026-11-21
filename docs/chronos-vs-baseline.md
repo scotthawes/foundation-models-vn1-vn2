@@ -81,6 +81,26 @@ fixing the high-volume ones. The remaining lever is therefore **per-series calib
 each series' forecast bias on earlier windows and correct that series only. That is untested here,
 and it is the only lever the diagnosis leaves open.
 
+**It was tested, and it fails too.** `calibrated_chronos` estimates each series' realised/forecast
+ratio on the four most recent 8-week windows that end before the round (censored weeks excluded,
+ratio shrunk toward 1 by 2 pseudo-units, clipped to 0.5-2.5). The factors are noisy: median 1.16,
+mean 1.33, 10% of series pinned at the 2.5 cap and 37% below 1 — because three windows of
+eight-week-ahead forecasts are a thin basis for a per-series ratio.
+
+| configuration | tuning mean | played weeks | lost sales | holding |
+| --- | ---: | ---: | ---: | ---: |
+| uncalibrated, coverage 3.5 | 4,858.7 | 4,237.2 | 2,541 | 1,696.2 |
+| calibrated, coverage 3.0 | 5,433.4 | 4,907.0 | 3,093 | 1,814.0 |
+| calibrated, coverage 3.5 | 5,761.3 | 4,821.0 | 2,461 | 2,360.0 |
+
+Calibration adds stock and does not buy service: at coverage 3.5 it costs 664 EUR more in holding
+and removes only 80 lost sales, because the uplift goes to series whose ratio was estimated from
+noise while the high-volume series are corrected slightly or, for the 37% with a ratio below one,
+downward. The mismatch is structural, not a tuning failure: the policy needs a per-series mean, and
+a zero-shot median scaled by noisy ratios is not one. A model fitted to this task — fine-tuned, or
+a quantile forecast evaluated against the actual cost function — is the only route left, and it is
+outside what a zero-shot comparison can claim.
+
 ## VN1: yes, and already at the median
 
 VN1's score is absolute error plus a bias penalty, so the median is the right forecast and the only

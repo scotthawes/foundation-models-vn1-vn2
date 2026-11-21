@@ -17,6 +17,7 @@ from .naive import naive_mean, seasonal_naive
 from .seasonal import seasonal_moving_average
 
 __all__ = [
+    "calibrated_chronos",
     "chronos",
     "naive_mean",
     "seasonal_moving_average",
@@ -37,6 +38,13 @@ def tabpfn(**kwargs):
 def chronos(**kwargs):
     """The Chronos arm; see `vn2.forecaster.chronos_arm`."""
     from .chronos_arm import chronos as factory
+
+    return factory(**kwargs)
+
+
+def calibrated_chronos(**kwargs):
+    """Chronos with a causal per-series bias correction; see `vn2.forecaster.chronos_arm`."""
+    from .chronos_arm import calibrated_chronos as factory
 
     return factory(**kwargs)
 
