@@ -90,6 +90,22 @@ def test_an_unknown_target_transform_is_refused_at_construction():
         forecaster.tabpfn_api(target="sqrt")
 
 
+def test_the_ratio_target_round_trips_and_dead_series_stay_zero():
+    """The arithmetic that the queued VN2 run will depend on, tested before it spends quota."""
+    from vn2.forecaster.tabpfn_api_arm import _from_ratio, _to_ratio
+
+    base = np.array([10.0, 0.0, 0.4])
+    demand = np.array([4.0, 7.0, 2.0])
+
+    ratios = _to_ratio(demand, base)
+    restored = _from_ratio(ratios, base)
+
+    assert restored[0] == pytest.approx(4.0)  # a live series round-trips exactly
+    assert restored[1] == 0.0                 # no recent mean: no order, not a wild multiple
+    assert restored[2] == 0.0                 # below the floor, treated the same way
+    assert np.isfinite(ratios).all()
+
+
 def test_every_arm_is_a_factory_returning_a_callable():
     for factory in (
         forecaster.naive_mean,

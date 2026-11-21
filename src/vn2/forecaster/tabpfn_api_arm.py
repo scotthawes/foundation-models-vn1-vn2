@@ -36,6 +36,20 @@ DEFAULT_PREDICT_BATCH = 1_000  # rows per predict() call; keeps each request sma
 DEFAULT_ESTIMATORS = 4
 
 
+def _to_ratio(targets: np.ndarray, base: np.ndarray) -> np.ndarray:
+    """Demand as a multiple of the series' recent mean; a dead series is a zero multiple.
+
+    The floor of 0.5 units stops a series with a near-zero base from producing a wild multiple,
+    and makes the inversion exact: whatever `_from_ratio` gets back for a dead series is zero.
+    """
+    alive = base > 0.5
+    return np.where(alive, targets / np.where(alive, base, 1.0), 0.0)
+
+
+def _from_ratio(multiples: np.ndarray, base: np.ndarray) -> np.ndarray:
+    return multiples * np.where(base > 0.5, base, 0.0)
+
+
 def tabpfn_api(
     model_path: str = DEFAULT_MODEL,
     max_train_rows: int = DEFAULT_MAX_TRAIN_ROWS,
@@ -83,8 +97,7 @@ def tabpfn_api(
         elif target == "ratio":
             base_train = rows["mean_13"].to_numpy(dtype=float)
             base_test = asked["mean_13"].to_numpy(dtype=float)
-            alive = base_train > 0.5
-            y = np.where(alive, y / np.where(alive, base_train, 1.0), 0.0)
+            y = _to_ratio(y, base_train)
 
         model = TabPFNRegressor(
             model_path=model_path, n_estimators=n_estimators, random_state=seed
@@ -102,7 +115,7 @@ def tabpfn_api(
         if target == "log1p":
             predicted = np.expm1(predicted)
         elif target == "ratio":
-            predicted = predicted * np.where(base_test > 0.5, base_test, 0.0)
+            predicted = _from_ratio(predicted, base_test)
         predicted = np.clip(predicted, 0.0, None)  # demand cannot be negative
 
         values = predicted.reshape(len(HORIZONS), len(sales)).T  # (row, horizon)
