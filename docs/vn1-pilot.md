@@ -79,6 +79,29 @@ The trend features made it **worse by 0.06**. The hypothesis is rejected: the ab
 already carries the level, and the extra ratios pushed the forecast the wrong way. TabPFN's deficit
 on this task is not a missing-feature problem.
 
+## Target shape: the missing piece
+
+The last untested knob was the target itself. VN1's targets are 72% zeros and span orders of
+magnitude across series, and the arm was asking the model to predict the absolute level of each.
+Two transforms were tried on the validation origin, then checked on the held-out weeks:
+
+| configuration (500 series) | validation | final |
+| --- | ---: | ---: |
+| raw target, 20k context | 0.7082 | 0.8391 |
+| raw target, 65k context | 0.6223 | — |
+| `log1p` target, 65k context | 0.5160 | — |
+| **per-series ratio target, 65k context** | **0.4324** | **0.6219** |
+| references: MA12 / Chronos | 0.4836 / 0.4106 | 0.6261 / 0.5690 |
+
+A ratio target divides each sale by its series' own 13-week mean, so the model learns "how many
+multiples of recent demand" rather than an absolute level that differs by three orders of magnitude
+between series. That moves TabPFN from last to second: it beats MA12 on both origins, sits 0.02
+behind Chronos on validation and 0.05 behind on the played weeks.
+
+This is the answer to the pilot's question about TabPFN: the model was not the problem, the target
+representation was. It is also a warning about the earlier negative result — three of the four
+probes were measuring a mis-specified arm.
+
 ## Full population (15,053 series)
 
 The winner was scaled, and the sample turned out to flatter it:
@@ -107,24 +130,32 @@ baseline on the played weeks by about 7% relative, with essentially the same bia
 edge, and it does not appear on the validation origin, so it is one window's evidence rather than a
 robust win.
 
-TabPFN was not scaled. It was last on every configuration tried and the question the pilot set out
-to answer — whether there is signal worth scaling — was answered by Chronos.
+TabPFN could not be scaled. The ratio-target arm needs the API, and the account's monthly quota
+(5,000,000 tokens) was exhausted by the 65k-context probes: the full-population fit succeeded and
+the prediction was rejected with **HTTP 429**, reset 2026-12-01. What exists for TabPFN is the
+500-series evidence above — held out, but a sample. The population-scale number is the one thing
+this pilot set out to price and did not get.
 
 ## What this does and does not show
 
-- It shows the VN1 question is answerable and cheap: the whole full-population comparison costs no
-  API tokens, and the MA12 baseline reproduces the organisers' 0.6597 exactly.
+- It shows the VN1 question is answerable and cheap: the full-population comparison of Chronos
+  against MA12 costs no API tokens, and the MA12 baseline reproduces the organisers' 0.6597 exactly.
 - It shows why pilots mislead: the 500-series sample's 0.07 Chronos lead halved at full population
   on one origin and vanished on the other. Sampling series uniformly is not sampling *volume*
   uniformly.
-- It does not explain TabPFN's deficit. Context size helped, trend features hurt; a target
-  transform and per-series normalisation remain untested.
-- It cannot handle censoring: VN1 has no in-stock flag, so a stock-out is indistinguishable from
-  low demand. This is a limitation of the data, not of the arms.
+- It shows the tabular arm's deficit was **target representation, not the model**: a per-series
+  ratio target took TabPFN from 0.8391 to 0.6219 on the held-out weeks, past MA12.
+- It does not establish TabPFN's population-scale score, and the tabular stock comparison is
+  therefore sample-scale only. Nor can any arm handle censoring: VN1 has no in-stock flag, so a
+  stock-out is indistinguishable from low demand.
+- It cost the API's month: five probe runs at 65k context spent the 5M quota. Cheaper would have
+  been one probe at 20k context before committing to the larger ones.
 
 ## Next, if it is continued
 
-1. A second scored window would settle whether Chronos's 0.047 edge is real. The files here contain
+1. When the token quota resets (2026-12-01) or is raised, run the ratio-target arm on all 15,053
+   series: at the measured 50,723 tokens per origin it costs little, and it is the missing row.
+2. A second scored window would settle whether Chronos's 0.047 edge is real. The files here contain
    only one (Phase 1), so that needs Phase 2 data.
-2. TabPFN's untested knobs are a log1p target (72% of cells are zero) and per-series normalisation.
-3. Multiple seeds, and stratify by volume rather than sampling series uniformly.
+3. Multiple seeds, and stratify by volume rather than sampling series uniformly — the pilot's
+   sample-bias lesson.

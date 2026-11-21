@@ -78,3 +78,8 @@ def test_trend_features_are_scale_free():
 
     assert ratio_columns
     pd.testing.assert_frame_equal(base[ratio_columns], scaled[ratio_columns])
+
+
+def test_an_unknown_target_transform_is_refused_at_construction():
+    with pytest.raises(ValueError, match="target transform"):
+        vn1f.tabpfn_api(target="sqrt")

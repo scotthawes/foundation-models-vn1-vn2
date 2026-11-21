@@ -72,8 +72,20 @@ def tabpfn_api(
     step: int = 4,
     predict_batch_size: int = 2_000,
     trend: bool = False,
+    target: str = "raw",
 ):
-    """TabPFN through the Prior Labs API, on the lag/price/hierarchy table."""
+    """TabPFN through the Prior Labs API, on the lag/price/hierarchy table.
+
+    `target` is the untested knob the pilot left open. VN1's targets are 72% zeros and span orders
+    of magnitude, so two transforms are offered next to the raw column:
+
+    - `log1p` — fit and predict in log space, invert on the way out;
+    - `ratio` — divide each target by its series' 13-week mean (a scale-free multiple), multiply
+      back at prediction time; a series with no recent demand is predicted at zero rather than
+      given an arbitrary multiple.
+    """
+    if target not in ("raw", "log1p", "ratio"):
+        raise ValueError(f"unknown target transform {target!r}")
 
     def forecaster(sales: pd.DataFrame, price: pd.DataFrame) -> pd.DataFrame:
         from tabpfn_client import TabPFNRegressor
@@ -86,10 +98,20 @@ def tabpfn_api(
             sales, price, max_train_rows=max_train_rows, lookback=lookback, step=step,
             horizon=horizon, trend=trend,
         )
+        y = y_train.to_numpy(dtype=float)
+        base_test = None
+        if target == "log1p":
+            y = np.log1p(y)
+        elif target == "ratio":
+            base_train = X_train["mean_13"].to_numpy(dtype=float)
+            base_test = X_test["mean_13"].to_numpy(dtype=float)
+            alive = base_train > 0.5
+            y = np.where(alive, y / np.where(alive, base_train, 1.0), 0.0)
+
         model = TabPFNRegressor(
             model_path="v3.5_default", n_estimators=n_estimators, random_state=0
         )
-        model.fit(X_train, y_train)
+        model.fit(X_train, y)
         predicted = np.concatenate(
             [
                 np.asarray(
@@ -99,6 +121,10 @@ def tabpfn_api(
                 for start in range(0, len(X_test), predict_batch_size)
             ]
         )
+        if target == "log1p":
+            predicted = np.expm1(predicted)
+        elif target == "ratio":
+            predicted = predicted * np.where(base_test > 0.5, base_test, 0.0)
         values = np.clip(predicted, 0.0, None).reshape(horizon, len(sales)).T
         return _frame(values, sales, horizon)
 

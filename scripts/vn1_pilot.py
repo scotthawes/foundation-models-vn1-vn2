@@ -52,12 +52,13 @@ def evaluate(forecaster, history: pd.DataFrame, price: pd.DataFrame, actual: pd.
     return score(prediction, actual), elapsed
 
 
-def build_arms(names: list[str], train_rows: int, trend: bool = False) -> dict:
+def build_arms(names: list[str], train_rows: int, trend: bool = False,
+               target: str = "raw") -> dict:
     """Every arm takes `(history, price)`; the cheap ones ignore the price frame."""
     arms = {}
     for name in names:
         if name == "tabpfn_api":
-            arms[name] = vn1f.tabpfn_api(max_train_rows=train_rows, trend=trend)
+            arms[name] = vn1f.tabpfn_api(max_train_rows=train_rows, trend=trend, target=target)
         elif name == "chronos":
             arms[name] = vn1f.chronos()
         elif hasattr(vn1f, name):
@@ -76,6 +77,9 @@ def main() -> int:
     parser.add_argument("--train-rows", type=int, default=20_000)
     parser.add_argument("--trend", action="store_true",
                         help="add scale-free trend features to the tabular arm")
+    parser.add_argument("--target", default="raw", choices=["raw", "log1p", "ratio"],
+                        help="target transform for the tabular arm")
+    parser.add_argument("--origins", default="both", choices=["both", "validation", "final"])
     parser.add_argument("--arms", default="ma12,naive_last,tabpfn_api,chronos")
     parser.add_argument("--quote-only", action="store_true")
     args = parser.parse_args()
@@ -108,7 +112,7 @@ def main() -> int:
         return 0
 
     arms = build_arms([n.strip() for n in args.arms.split(",") if n.strip()], args.train_rows,
-                      trend=args.trend)
+                      trend=args.trend, target=args.target)
     rows = []
 
     # Context: the cheap arms on the whole population, one line each.
@@ -120,10 +124,13 @@ def main() -> int:
                      "score": round(value, 4), "seconds": round(elapsed, 1)})
         print(f"{name:12s} all 15,053  final      {value:.4f}", flush=True)
 
-    for origin, history, actual in (
-        ("validation", validation_history, validation_actual),
-        ("final", sampled, final_actual),
-    ):
+    origins = {
+        "validation": ("validation", validation_history, validation_actual),
+        "final": ("final", sampled, final_actual),
+    }
+    wanted = ["validation", "final"] if args.origins == "both" else [args.origins]
+    for origin in wanted:
+        _, history, actual = origins[origin]
         for name, forecaster in arms.items():
             value, elapsed = evaluate(forecaster, history, sampled_price, actual)
             rows.append({"origin": origin, "scope": f"{len(sampled):,} sample", "arm": name,
@@ -132,7 +139,7 @@ def main() -> int:
                   f"({elapsed:,.1f}s)", flush=True)
 
     results = pd.DataFrame(rows)
-    suffix = f"-rows{args.train_rows}{'-trend' if args.trend else ''}"
+    suffix = f"-rows{args.train_rows}{'-trend' if args.trend else ''}{'-' + args.target if args.target != 'raw' else ''}"
     label = "all" if args.all else str(args.series)
     out = Path("results") / f"vn1-pilot-{label}{suffix}.csv"
     out.parent.mkdir(exist_ok=True)
