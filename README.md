@@ -30,6 +30,10 @@ the competition's own moving average once its coverage is lowered. Fold variance
 is larger than every gap being argued about. Full tables, bars and verdicts in
 [`docs/method.md`](docs/method.md).
 
+**Direction:** Chronos is the standing foundation-model arm — local, quota-free, and the only one
+that beats the organisers' baseline on VN1. TabPFN is retired from the comparison except for one
+pre-registered VN2 check with a ratio target, queued for when the API quota resets.
+
 ## Quickstart
 
 ```bash

@@ -159,3 +159,11 @@ this pilot set out to price and did not get.
    only one (Phase 1), so that needs Phase 2 data.
 3. Multiple seeds, and stratify by volume rather than sampling series uniformly — the pilot's
    sample-bias lesson.
+
+## Decision (2026-11-21)
+
+Chronos is the standing foundation-model arm. It is local, needs no quota, and it is the only
+foundation model here that beats the organisers' baseline on the weeks that were scored. TabPFN is
+retired from the comparison except for one pre-registered VN2 check (see `method.md`); no further
+VN1 TabPFN work is planned, including the full-population row above, which stays a gap rather than
+a commitment.

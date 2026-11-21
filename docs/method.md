@@ -195,6 +195,12 @@ The bars do not move: an arm wins only if the paired difference exceeds its fold
 A measured VN2 fit is quoted at the 10,000-token minimum, so the whole sequence costs well under
 1M tokens. This amendment was written before any of it was run.
 
+**Decision (2026-11-21).** Chronos is the standing foundation-model arm for both tasks: it runs
+locally, needs no quota, and on VN1 it beats the organisers' baseline where TabPFN does not. TabPFN
+is retired from the comparison after the one check above — it runs once, and only a win on the
+tuning anchors keeps it alive. No further TabPFN tuning is planned; the arm code stays in the tree
+so the check is reproducible.
+
 ## Costs and quota
 
 TabPFN free tier: 5M tokens/day, 20M/month, 10k-token minimum per operation, reset midnight UTC.
