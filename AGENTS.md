@@ -26,6 +26,9 @@ against simple baselines on two forecasting competitions. Results and reasoning:
 - Numbers in documents are generated from `results/*.csv`, never retyped.
 - Check scale invariance before expecting a time-series model to set a level (multiply the input by
   three; if the output triples, it cannot).
+- State the leakage caveat with any foundation-model result: the checkpoints postdate the public data
+  and their cards do not enumerate series, so contamination cannot be ruled out (see §6 of
+  `docs/writeup.md`).
 
 ## Environment
 

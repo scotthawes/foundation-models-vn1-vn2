@@ -67,6 +67,10 @@ Every VN2 arm shares one ordering policy, so differences are differences in fore
 
 ## What is still open
 
+- **Leakage cannot be ruled out.** Chronos-2 and TimesFM-3 were released after both competitions'
+  data were public, and their model cards do not enumerate series. Contamination can only flatter a
+  model, so VN2's loss is robust while VN1's win is provisional. Details in
+  [`docs/writeup.md`](docs/writeup.md).
 - **A second scored window for VN1** — the win is one window and 0.35 points; Phase 2 data for a
   second window is not public.
 - **VN2 has no open foundation-model route.** The ratio target, the last one, ran on 2026-11-22 and

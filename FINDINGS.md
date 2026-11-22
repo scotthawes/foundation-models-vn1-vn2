@@ -123,6 +123,15 @@ tabular model with absolute values could in principle learn.
 - **Discipline that paid off here:** pre-register the selection rule, score the held-out window
   once, and use paired fold errors. Twice, an apparent result reversed once that was applied.
 
+## Leakage caveat
+
+The time-series models were released after VN1 (October 2024) and VN2 (2025) published their data,
+and their model cards name corpora — *GIFT-Eval Pretrain*, *Chronos Datasets* — without enumerating
+series. Training-data contamination therefore cannot be ruled out. Because contamination can only
+flatter a model, it does not weaken VN2's loss (a possibly-advantaged model still lost to a moving
+average) but it does make VN1's 0.35-point win provisional. See §6 of
+[`docs/writeup.md`](docs/writeup.md).
+
 ## Still open
 
 - **A second scored window for VN1** — needed to know whether the 0.35-point margin replicates; the

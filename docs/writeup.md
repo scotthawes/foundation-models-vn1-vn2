@@ -113,7 +113,35 @@ Two further lessons from the process:
   weight. A model can tie the winner on MAE and lose by five points, or beat the benchmark and still
   lose to a moving average.
 
-## 6. Threats to validity
+## 6. Leakage: the models may have been trained on these series
+
+Neither competition's data can be certified absent from pretraining, and this bears directly on the
+headline result.
+
+- **What the model cards say.** Chronos-2 (released June 2026) trains on a subset of *Chronos
+  Datasets* and a subset of *GIFT-Eval Pretrain*, plus synthetic data. TimesFM-3 trains on
+  *GIFT-Eval Pretrain* excluding datasets overlapping its benchmark. Neither card enumerates series,
+  so a reader cannot check.
+- **The timing allows it.** VN1 published its data in October 2024 and VN2 in 2025; Chronos-2 and
+  TimesFM-3 were released after both. A public retail dataset could plausibly be in a large
+  pretraining corpus, and no check here rules it out.
+- **The bias runs one way.** Contamination can only make a model look better than it is. That
+  matters differently for the two results:
+  - **VN1's win is the at-risk one.** It rests on a 0.35-point margin over the winning entry, on one
+    window, and the scored window (Phase 2) is exactly the kind of public data a later model could
+    have seen. Treat it as provisional.
+  - **VN2's loss is robust to it.** A model that had seen the data would be advantaged, and the best
+    foundation arm still lost to a moving average by 162 €. Leakage cannot rescue a negative result;
+    it strengthens it.
+- **Bolt-small is not exempt either.** It predates VN2's release but only just VN1's, and its
+  pretraining corpus is equally unverifiable.
+
+What a reader could do instead: prefer checkpoints whose pretraining cutoff precedes the data
+release, consult GIFT-Eval's "test data leakage" column, evaluate on a window after the model's
+release date, or ask the model authors for per-dataset inclusion. None of these is conclusive at
+series level, which is why the caveat is stated rather than resolved.
+
+## 7. Threats to validity
 
 - **VN1 is one window.** The margin is 0.35 points, q=0.55 scores 46.98, and Phase 2 was examined
   repeatedly during the search. Treat the win as "would have won that window", not "would win".
@@ -125,7 +153,7 @@ Two further lessons from the process:
 - **Not every model was run.** Toto-2.0, Moirai2 and Sundial were ranked but never tested here, and
   the machine had under 6 GB of free disk, a real constraint on further checkpoints.
 
-## 7. Suggested changes for a reader
+## 8. Suggested changes for a reader
 
 - **Separate the core from the competitions.** `src/vn1` and `src/vn2` duplicate loading, forecasting
   and scoring logic. A shared `fm_eval` core with task adapters would make a third competition a
@@ -138,7 +166,7 @@ Two further lessons from the process:
 - **Record the decomposition, not just the score.** MAE and bias separately; lost sales and holding
   separately. The scores were ambiguous; the decompositions were not.
 
-## 8. Future tasks, in expected-value order
+## 9. Future tasks, in expected-value order
 
 1. **VN2 with a task-fitted model.** The winning entry used ensembled LightGBM on lags, price and
    hierarchy. The same feature table already exists in `src/vn2/features.py`; adding a LightGBM arm
@@ -160,7 +188,7 @@ Two further lessons from the process:
 7. **A rolling-origin protocol with paired bootstrap errors**, replacing fold standard errors, which
    understate uncertainty because the windows overlap.
 
-## 9. Reproduce
+## 10. Reproduce
 
 ```bash
 git clone https://github.com/scotthawes/foundation-models-vn1-vn2.git && cd foundation-models-vn1-vn2
