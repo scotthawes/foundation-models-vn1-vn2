@@ -1,7 +1,7 @@
 [project]
-name = "vn2-inventory"
-version = "0.1.0"
-description = "Replaying the VN2 inventory competition with tabular and time-series foundation models"
+name = "foundation-models-vn1-vn2"
+version = "1.0.0"
+description = "Tabular and time-series foundation models on the VN1 forecasting and VN2 inventory competitions"
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.26",
