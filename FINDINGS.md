@@ -83,6 +83,7 @@ average's errors land where a held unit costs 0.2 €; the model's land where a 
 | strategy | result | verdict |
 | --- | --- | --- |
 | TabPFN, raw targets | 4,252 € competition | loses by 337 |
+| TabPFN, ratio target | 4,581 tuning | no change from raw (0.1 €); loses by 194 |
 | Bolt: per-week quantiles, global scale | best 4,859 tuning | loses by 494 |
 | Bolt: per-series causal calibration | 5,433 tuning | worse by 1,068 |
 | Chronos-2: quantiles 0.5–0.7, coverage 3–3.5 | best 4,626 tuning | loses by 261 |
@@ -124,11 +125,12 @@ tabular model with absolute values could in principle learn.
 
 ## Still open
 
-- **TabPFN with a ratio target on VN2** — implemented, tested for arithmetic, pre-registered, and
-  blocked by the Prior Labs monthly quota until 2026-12-01. It is the one foundation-model route that
-  can attack the allocation defect.
 - **A second scored window for VN1** — needed to know whether the 0.35-point margin replicates; the
   Phase 2 data for a second window is not public.
+- **VN2 has no open foundation-model route.** The ratio target, the last one, was run on 2026-11-22
+  and changed nothing (4,580.9 against 4,581.0 raw). A task-fitted tabular model — LightGBM on the
+  same feature table, which is what the winning entry used — is the remaining idea, but it is outside
+  the foundation-model comparison this repo set out to make.
 
 ## Reproduce
 

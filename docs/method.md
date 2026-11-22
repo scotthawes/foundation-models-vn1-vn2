@@ -176,7 +176,7 @@ The honest summary: TabPFN and Chronos both price a shelf competently, the movin
 coverage 3.5 prices it slightly better, and the foundation-model comparison is too small a signal
 for eight weeks to settle.
 
-## Amendment 2026-11-21: target representation (queued, not yet run)
+## Amendment 2026-11-21: target representation (run 2026-11-22: no effect on VN2)
 
 The VN1 pilot (`docs/vn1-pilot.md`) found that TabPFN's bad showing there was a target
 mis-specification, not a model limit: dividing each sale by its series' 13-week mean and multiplying
@@ -208,6 +208,16 @@ for the ratio one:
 python3 scripts/backtest.py --anchors tuning --arms benchmark,seasonal_ma,tabpfn_api \
     --coverages 3.5 --target ratio --tag tuning-ratio
 ```
+
+**Result (2026-11-22).** With the quota raised, the check ran: TabPFN with the ratio target scores
+**4,580.9** on the tuning anchors, against 4,581.0 for raw targets — no change — and **193.9 ± 79.6**
+(t 2.44) worse than `seasonal_ma`'s 4,387.1. Per the rule, neither the evaluation nor the competition
+anchor was run.
+
+The transform is not inert — predictions differ from the raw arm (correlation 0.9958, mean absolute
+difference 0.42) — it simply does not help here. The VN1 gain came from a target spread of orders of
+magnitude across 15,053 series; VN2's 599 series share a scale, and its feature table already carries
+`mean_13`, so re-expressing the target adds nothing. TabPFN stays retired for VN2.
 
 ## Amendment 2026-11-21 (2): does Chronos have a lever the average lacks?
 

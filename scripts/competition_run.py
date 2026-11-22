@@ -44,6 +44,8 @@ def main() -> int:
     parser.add_argument("--coverage", type=float, default=3.5)
     parser.add_argument("--chronos2-quantile", type=float, default=0.5,
                         help="quantile for the Chronos-2 arm, if it is in --arms")
+    parser.add_argument("--tabpfn-target", default="raw", choices=["raw", "log1p", "ratio"],
+                        help="target transform for the TabPFN arm, if it is in --arms")
     parser.add_argument("--tag", default="competition")
     args = parser.parse_args()
 
@@ -51,6 +53,7 @@ def main() -> int:
     ARMS["chronos2"] = lambda: forecaster.chronos2(
         quantile=args.chronos2_quantile, cross_learning=True
     )
+    ARMS["tabpfn_api"] = lambda: forecaster.tabpfn_api(target=args.tabpfn_target)
 
     arm_names = [a.strip() for a in args.arms.split(",") if a.strip()]
     unknown = [a for a in arm_names if a not in ARMS]

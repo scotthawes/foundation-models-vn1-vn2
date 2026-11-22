@@ -67,11 +67,11 @@ Every VN2 arm shares one ordering policy, so differences are differences in fore
 
 ## What is still open
 
-- **TabPFN with a ratio target on VN2** — implemented and pre-registered
-  ([`docs/method.md`](docs/method.md)) but not yet run: the Prior Labs API's monthly quota is spent
-  until 2026-12-01. It is the one foundation-model route that can address VN2's level defect.
 - **A second scored window for VN1** — the win is one window and 0.35 points; Phase 2 data for a
   second window is not public.
+- **VN2 has no open foundation-model route.** The ratio target, the last one, ran on 2026-11-22 and
+  changed nothing (4,580.9 against 4,581.0 raw). A task-fitted LightGBM on the same features is what
+  the winning entry used, but it is outside the foundation-model comparison this repo is about.
 
 ## Reproduce
 
