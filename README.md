@@ -9,9 +9,9 @@ moving average, and why?**
 | **VN1** | 13-week sales forecasts, scored `MAE% + \|Bias%\|` | 15,053 series, 170 weeks | pure forecast accuracy | **won**: Chronos-2 q=0.56 → **46.02%** vs the winning entry's 46.37% |
 | **VN2** | 8-week inventory orders, scored `0.2·held + 1·lost` | 599 series, 157 weeks | cost-optimal stocking | **lost**: moving average **3,915 €**, best foundation arm 4,077 € |
 
-Full analysis: [`FINDINGS.md`](FINDINGS.md). Detailed records: [`docs/method.md`](docs/method.md)
-(VN2), [`docs/vn1-pilot.md`](docs/vn1-pilot.md) (VN1), [`docs/chronos-vs-baseline.md`](docs/chronos-vs-baseline.md)
-(model-vs-baseline comparison).
+Full analysis: [`FINDINGS.md`](FINDINGS.md) · final write-up: [`docs/writeup.md`](docs/writeup.md) ·
+detailed records: [`docs/method.md`](docs/method.md) (VN2), [`docs/vn1-pilot.md`](docs/vn1-pilot.md)
+(VN1), [`docs/chronos-vs-baseline.md`](docs/chronos-vs-baseline.md).
 
 ## The models
 
@@ -115,6 +115,9 @@ FINDINGS.md         what was tested, found, and recommended
 ```
 
 ## Status
+
+**Project closed 2026-11-22.** The closing account — what was done, the analysis, and the tasks a
+reader could pick up — is [`docs/writeup.md`](docs/writeup.md).
 
 - VN2 benchmark reproduced exactly (913.8 / 4,334.0) and pinned by tests.
 - VN1 scorer reproduces the organisers' reference scores (MA12 0.659707, naive 0.688207).
